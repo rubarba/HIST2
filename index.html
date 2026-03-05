@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Historic Maps</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Roboto, Arial, sans-serif;
+            background: #e5e3df;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        body.night {
+            background: #202124;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* Search box estilo Google Maps */
+        #search-box {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        body.night #search-box {
+            background: #292a2d;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        body.historic #search-box {
+            background: #f4e9d7;
+            box-shadow: 0 2px 6px rgba(92, 74, 58, 0.3);
+            border: 1px solid #d4b896;
+        }
+
+        body.atlas #search-box {
+            background: #efe6d6;
+            box-shadow: 0 2px 6px rgba(92, 74, 58, 0.2);
+            border: 1px solid #d8d0c0;
+        }
+
+        #destination-label {
+            font-size: 14px;
+            color: #70757a;
+        }
+
+        body.night #destination-label {
+            color: #9aa0a6;
+        }
+
+        body.historic #destination-label {
+            color: #8b7355;
+        }
+
+        body.atlas #destination-label {
+            color: #8b7355;
+        }
+
+        #destination-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #202124;
+            flex: 1;
+        }
+
+        body.night #destination-name {
+            color: #e8eaed;
+        }
+
+        body.historic #destination-name {
+            color: #5c4a3a;
+        }
+
+        body.atlas #destination-name {
+            color: #5c4a3a;
+        }
+
+        #destination-input {
+            display: none;
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            font-weight: 500;
+            color: #202124;
+            background: transparent;
+        }
+
+        body.night #destination-input {
+            color: #e8eaed;
+        }
+
+        #destination-input::placeholder {
+            color: #70757a;
+        }
+
+        body.night #destination-input::placeholder {
+            color: #9aa0a6;
+        }
+
+        /* Filtros de categorias */
+        #category-filters {
+            position: fixed;
+            top: 80px;
+            left: 16px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        #category-filters::-webkit-scrollbar {
+            display: none;
+        }
+
+        .category-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #e8eaed;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #5f6368;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            user-select: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        body.night .category-chip {
+            background: #292a2d;
+            border-color: #3c4043;
+            color: #9aa0a6;
+        }
+
+        body.historic .category-chip {
+            background: #f4e9d7;
+            border-color: #d4b896;
+            color: #5c4a3a;
+        }
+
+        body.atlas .category-chip {
+            background: #efe6d6;
+            border-color: #d8d0c0;
+            color: #5c4a3a;
+        }
+
+        .category-chip.active {
+            background: #1a73e8;
+            border-color: #1a73e8;
+            color: white;
+        }
+
+        body.night .category-chip.active {
+            background: #8ab4f8;
+            border-color: #8ab4f8;
+            color: #202124;
+        }
+
+        body.historic .category-chip.active {
+            background: #8b6f47;
+            border-color: #8b6f47;
+            color: #fff8e7;
+        }
+
+        body.atlas .category-chip.active {
+            background: #b07a3b;
+            border-color: #b07a3b;
+            color: #efe6d6;
+        }
+
+        .category-chip:active {
+            transform: scale(0.96);
+        }
+
+        .category-icon {
+            font-size: 16px;
+        }
+
+        /* Autocomplete dropdown */
+        #autocomplete {
+            position: fixed;
+            top: 80px;
+            left: 16px;
+            right: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1001;
+        }
+
+        body.night #autocomplete {
+            background: #292a2d;
+        }
+
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        body.night .autocomplete-item {
+            border-bottom: 1px solid #3c4043;
+        }
+
+        .autocomplete-item:hover {
+            background: #f1f3f4;
+        }
+
+        body.night .autocomplete-item:hover {
+            background: #3c4043;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .place-name {
+            font-size: 15px;
+            color: #202124;
+            font-weight: 500;
+        }
+
+        body.night .place-name {
+            color: #e8eaed;
+        }
+
+        .place-address {
+            font-size: 13px;
+            color: #70757a;
+            margin-top: 2px;
+        }
+
+        body.night .place-address {
+            color: #9aa0a6;
+        }
+
+        /* Controlo layers (modo mapa) */
+        #layers-btn {
+            position: fixed;
+            top: 90px;
+            right: 16px;
+            z-index: 1000;
+            min-width: 100px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            color: #202124;
+        }
+
+        body.night #layers-btn {
+            background: #292a2d;
+            color: #e8eaed;
+        }
+
+        body.historic #layers-btn {
+            background: #f4e9d7;
+            color: #5c4a3a;
+        }
+
+        body.atlas #layers-btn {
+            background: #efe6d6;
+            color: #5c4a3a;
+        }
+
+        /* Filtro sépia para modo histórico */
+        body.historic #map {
+            filter: sepia(0.3) saturate(0.8) contrast(1.1);
+        }
+
+        body.historic .mapboxgl-ctrl-logo {
+            filter: grayscale(1) opacity(0.5);
+        }
+
+        /* Filtro atlas editorial */
+        body.atlas #map {
+            filter: saturate(0.75) contrast(1.05);
+        }
+
+        body.atlas .mapboxgl-ctrl-logo {
+            filter: grayscale(1) opacity(0.4);
+        }
+
+        /* Controlos zoom estilo Google Maps */
+        #zoom-controls {
+            position: fixed;
+            bottom: 240px;
+            right: 16px;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        body.night #zoom-controls {
+            background: #292a2d;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: #5f6368;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        body.night .zoom-btn {
+            background: #292a2d;
+            color: #9aa0a6;
+            border-bottom-color: #3c4043;
+        }
+
+        body.historic .zoom-btn {
+            background: #f4e9d7;
+            color: #5c4a3a;
+            border-bottom-color: #d4b896;
+        }
+
+        body.atlas .zoom-btn {
+            background: #efe6d6;
+            color: #5c4a3a;
+            border-bottom-color: #d8d0c0;
+        }
+
+        .zoom-btn:last-child {
+            border-bottom: none;
+        }
+
+        .zoom-btn:active {
+            background: #f1f3f4;
+        }
+
+        body.night .zoom-btn:active {
+            background: #3c4043;
+        }
+
+        body.historic .zoom-btn:active {
+            background: #e8dcc4;
+        }
+
+        body.atlas .zoom-btn:active {
+            background: #e5ddc8;
+        }
+
+        /* Botão vista 2D/3D */
+        #view-toggle {
+            position: fixed;
+            bottom: 320px;
+            right: 16px;
+            z-index: 1000;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.night #view-toggle {
+            background: #292a2d;
+        }
+
+        #view-toggle.active {
+            display: flex;
+        }
+
+        /* Botão localização */
+        #locate-btn {
+            position: fixed;
+            bottom: 180px;
+            right: 16px;
+            z-index: 1000;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.night #locate-btn {
+            background: #292a2d;
+        }
+
+        /* Markers */
+        .marker {
+            width: 24px;
+            height: 24px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23ea4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle fill="white" cx="12" cy="9" r="2.5"/></svg>');
+            background-size: contain;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .marker:hover {
+            transform: scale(1.15);
+        }
+
+        .user-marker {
+            width: 18px;
+            height: 18px;
+            background: #4285f4;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 0 1px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        /* Bottom sheet - estilo Google Maps */
+        #bottom-sheet {
+            position: fixed;
+            bottom: -300px;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -2px 16px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transition: bottom 0.3s ease;
+            max-height: 50vh;
+        }
+
+        body.night #bottom-sheet {
+            background: #292a2d;
+        }
+
+        #bottom-sheet.active {
+            bottom: 0;
+        }
+
+        #sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: #dadce0;
+            border-radius: 2px;
+            margin: 12px auto;
+        }
+
+        body.night #sheet-handle {
+            background: #5f6368;
+        }
+
+        #sheet-content {
+            padding: 0 20px 20px;
+        }
+
+        #location-name {
+            font-size: 20px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 8px;
+        }
+
+        body.night #location-name {
+            color: #e8eaed;
+        }
+
+        #now-playing {
+            font-size: 12px;
+            color: #5f6368;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        body.night #now-playing {
+            color: #9aa0a6;
+        }
+
+        #progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e8eaed;
+            border-radius: 2px;
+            margin-bottom: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.night #progress-bar {
+            background: #3c4043;
+        }
+
+        #progress-fill {
+            height: 100%;
+            background: #1a73e8;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        body.night #progress-fill {
+            background: #8ab4f8;
+        }
+
+        #time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #5f6368;
+            margin-bottom: 16px;
+        }
+
+        body.night #time-display {
+            color: #9aa0a6;
+        }
+
+        #controls {
+            display: flex;
+            gap: 16px;
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: 10px;
+            background: #f1f3f4;
+            border: none;
+            border-radius: 20px;
+            color: #5f6368;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        body.night .control-btn {
+            background: #3c4043;
+            color: #9aa0a6;
+        }
+
+        .control-btn.primary {
+            background: #1a73e8;
+            color: white;
+        }
+
+        body.night .control-btn.primary {
+            background: #8ab4f8;
+            color: #202124;
+        }
+
+        /* Navigation panel */
+        #nav-panel {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 20px;
+            z-index: 999;
+            display: none;
+        }
+
+        body.night #nav-panel {
+            background: #292a2d;
+        }
+
+        body.historic #nav-panel {
+            background: #f4e9d7;
+            border: 2px solid #d4b896;
+        }
+
+        body.atlas #nav-panel {
+            background: #efe6d6;
+            border: 2px solid #d8d0c0;
+        }
+
+        #nav-panel.active {
+            display: block;
+        }
+
+        #nav-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 16px;
+        }
+
+        .nav-stat {
+            text-align: center;
+        }
+
+        .nav-stat-label {
+            font-size: 11px;
+            color: #5f6368;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        body.night .nav-stat-label {
+            color: #9aa0a6;
+        }
+
+        body.historic .nav-stat-label {
+            color: #8b7355;
+        }
+
+        body.atlas .nav-stat-label {
+            color: #8b7355;
+        }
+
+        .nav-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #202124;
+            margin-top: 4px;
+        }
+
+        body.night .nav-stat-value {
+            color: #e8eaed;
+        }
+
+        body.historic .nav-stat-value {
+            color: #5c4a3a;
+        }
+
+        body.atlas .nav-stat-value {
+            color: #5c4a3a;
+        }
+
+        #start-nav-btn, #stop-nav-btn {
+            width: 100%;
+            padding: 14px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        #stop-nav-btn {
+            background: #ea4335;
+        }
+
+        body.night #start-nav-btn {
+            background: #8ab4f8;
+            color: #202124;
+        }
+
+        body.night #stop-nav-btn {
+            background: #f28b82;
+            color: #202124;
+        }
+
+        body.historic #start-nav-btn {
+            background: #8b6f47;
+            color: #fff8e7;
+        }
+
+        body.historic #stop-nav-btn {
+            background: #c17e4a;
+            color: #fff8e7;
+        }
+
+        body.atlas #start-nav-btn {
+            background: #b07a3b;
+            color: #efe6d6;
+        }
+
+        body.atlas #stop-nav-btn {
+            background: #d48c4a;
+            color: #efe6d6;
+        }
+
+        /* User marker navigation - seta */
+        .user-marker-nav {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #4285f4;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            transform-origin: 50% 80%;
+        }
+
+        /* Popup confirmação áudio */
+        #audio-prompt {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            padding: 24px;
+            z-index: 2000;
+            max-width: 320px;
+            width: calc(100% - 32px);
+            display: none;
+            animation: slideUp 0.3s ease;
+        }
+
+        body.night #audio-prompt {
+            background: #292a2d;
+        }
+
+        body.historic #audio-prompt {
+            background: #f4e9d7;
+            border: 2px solid #d4b896;
+        }
+
+        body.atlas #audio-prompt {
+            background: #efe6d6;
+            border: 2px solid #d8d0c0;
+        }
+
+        #audio-prompt.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, -40%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        #prompt-title {
+            font-size: 14px;
+            color: #5f6368;
+            margin-bottom: 8px;
+        }
+
+        body.night #prompt-title {
+            color: #9aa0a6;
+        }
+
+        body.historic #prompt-title,
+        body.atlas #prompt-title {
+            color: #8b7355;
+        }
+
+        #prompt-location {
+            font-size: 18px;
+            font-weight: 600;
+            color: #202124;
+            margin-bottom: 20px;
+        }
+
+        body.night #prompt-location {
+            color: #e8eaed;
+        }
+
+        body.historic #prompt-location,
+        body.atlas #prompt-location {
+            color: #5c4a3a;
+        }
+
+        #prompt-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .prompt-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #prompt-yes {
+            background: #1a73e8;
+            color: white;
+        }
+
+        body.night #prompt-yes {
+            background: #8ab4f8;
+            color: #202124;
+        }
+
+        body.historic #prompt-yes {
+            background: #8b6f47;
+            color: #fff8e7;
+        }
+
+        body.atlas #prompt-yes {
+            background: #b07a3b;
+            color: #efe6d6;
+        }
+
+        #prompt-no {
+            background: #f1f3f4;
+            color: #5f6368;
+        }
+
+        body.night #prompt-no {
+            background: #3c4043;
+            color: #9aa0a6;
+        }
+
+        body.historic #prompt-no,
+        body.atlas #prompt-no {
+            background: rgba(92, 74, 58, 0.1);
+            color: #5c4a3a;
+        }
+
+        .prompt-btn:active {
+            transform: scale(0.96);
+        }
+    </style>
+</head>
+<body>
+    <div id="search-box">
+        <span id="destination-label">Destino:</span>
+        <span id="destination-name">Peniche</span>
+        <input type="text" id="destination-input" placeholder="Procurar destino...">
+    </div>
+
+    <div id="category-filters">
+        <div class="category-chip active" data-category="historia">
+            <span class="category-icon">🏛️</span>
+            <span>História</span>
+        </div>
+        <div class="category-chip active" data-category="natureza">
+            <span class="category-icon">🌿</span>
+            <span>Natureza</span>
+        </div>
+        <div class="category-chip active" data-category="gastronomia">
+            <span class="category-icon">🍷</span>
+            <span>Gastronomia</span>
+        </div>
+        <div class="category-chip active" data-category="arquitetura">
+            <span class="category-icon">🏰</span>
+            <span>Arquitetura</span>
+        </div>
+        <div class="category-chip active" data-category="curiosidades">
+            <span class="category-icon">✨</span>
+            <span>Curiosidades</span>
+        </div>
+    </div>
+
+    <div id="autocomplete"></div>
+
+    <button id="layers-btn">🗺️ Normal</button>
+    
+    <button id="view-toggle">🗺️</button>
+    
+    <div id="zoom-controls">
+        <button class="zoom-btn" id="zoom-in">+</button>
+        <button class="zoom-btn" id="zoom-out">−</button>
+    </div>
+    
+    <button id="locate-btn">📍</button>
+
+    <div id="map"></div>
+
+    <div id="bottom-sheet">
+        <div id="sheet-handle"></div>
+        <div id="sheet-content">
+            <div id="now-playing">A reproduzir</div>
+            <div id="location-name">---</div>
+            <div id="progress-bar">
+                <div id="progress-fill"></div>
+            </div>
+            <div id="time-display">
+                <span id="current-time">0:00</span>
+                <span id="total-time">0:00</span>
+            </div>
+            <div id="controls">
+                <button class="control-btn primary" id="pause-btn">Pausar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="nav-panel">
+        <div id="nav-info">
+            <div class="nav-stat">
+                <div class="nav-stat-label">Distância</div>
+                <div class="nav-stat-value" id="distance-left">--</div>
+            </div>
+            <div class="nav-stat">
+                <div class="nav-stat-label">Tempo</div>
+                <div class="nav-stat-value" id="time-left">--</div>
+            </div>
+        </div>
+        <button id="start-nav-btn">Iniciar</button>
+        <button id="stop-nav-btn" style="display:none;">Parar</button>
+    </div>
+
+    <div id="audio-prompt">
+        <div id="prompt-title">Chegaste a</div>
+        <div id="prompt-location">---</div>
+        <div id="prompt-buttons">
+            <button class="prompt-btn" id="prompt-yes">Sim</button>
+            <button class="prompt-btn" id="prompt-no">Agora não</button>
+        </div>
+    </div>
+
+    <audio id="audio-player"></audio>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.js"></script>
+    <script>
+        // Configuração Mapbox
+        mapboxgl.accessToken = 'pk.eyJ1IjoicnVpYmFyYmEiLCJhIjoiY21tZG1hZXZkMDRldzJvczd5YWY0Z3I3aSJ9.bubaailQccZP22PXRNrYIg';
+        
+        // Modo dia/noite/historico/atlas
+        let mapMode = 'normal'; // normal, night, historic, atlas
+        const layersBtn = document.getElementById('layers-btn');
+        const locateBtn = document.getElementById('locate-btn');
+        const zoomInBtn = document.getElementById('zoom-in');
+        const zoomOutBtn = document.getElementById('zoom-out');
+        const viewToggle = document.getElementById('view-toggle');
+        let is3DView = true;
+        
+        // Search UI
+        const searchBox = document.getElementById('search-box');
+        const destinationName = document.getElementById('destination-name');
+        const destinationInput = document.getElementById('destination-input');
+        const autocompleteEl = document.getElementById('autocomplete');
+        
+        let currentDestination = {
+            name: 'Peniche',
+            coords: [-9.3813, 39.3558]
+        };
+        
+        // Navegação
+        let isNavigating = false;
+        let currentRoute = null;
+        let userLocation = null;
+        let userBearing = 0;
+        let watchId = null;
+        
+        // Sistema de categorias
+        const categoryFilters = {
+            historia: true,
+            natureza: true,
+            gastronomia: true,
+            arquitetura: true,
+            curiosidades: true
+        };
+        
+        // Carregar preferências guardadas
+        const savedFilters = localStorage.getItem('categoryFilters');
+        if (savedFilters) {
+            Object.assign(categoryFilters, JSON.parse(savedFilters));
+        }
+        
+        // Pontos históricos: Lisboa -> Peniche
+        const historicalPoints = [
+            {
+                id: 1,
+                name: "Torre de Belém",
+                lat: 38.6916,
+                lng: -9.2160,
+                radius: 200,
+                audio: "audio1.mp3",
+                categories: ["historia", "arquitetura"],
+                played: false,
+                prompted: false
+            },
+            {
+                id: 2,
+                name: "Mosteiro dos Jerónimos",
+                lat: 38.6979,
+                lng: -9.2061,
+                radius: 200,
+                audio: "audio2.mp3",
+                categories: ["historia", "arquitetura"],
+                played: false,
+                prompted: false
+            },
+            {
+                id: 3,
+                name: "Praia de Carcavelos",
+                lat: 38.6784,
+                lng: -9.3331,
+                radius: 500,
+                audio: "audio_carcavelos.mp3",
+                categories: ["natureza", "curiosidades"],
+                played: false,
+                prompted: false
+            },
+            {
+                id: 4,
+                name: "Palácio de Mafra",
+                lat: 38.9370,
+                lng: -9.3261,
+                radius: 300,
+                audio: "audio3.mp3",
+                categories: ["historia", "arquitetura"],
+                played: false,
+                prompted: false
+            },
+            {
+                id: 5,
+                name: "Óbidos",
+                lat: 39.3606,
+                lng: -9.1575,
+                radius: 400,
+                audio: "audio4.mp3",
+                categories: ["historia", "gastronomia"],
+                played: false,
+                prompted: false
+            },
+            {
+                id: 6,
+                name: "Peniche - Fortaleza",
+                lat: 39.3558,
+                lng: -9.3813,
+                radius: 300,
+                audio: "audio5.mp3",
+                categories: ["historia", "natureza"],
+                played: false,
+                prompted: false
+            }
+        ];
+
+        // Inicializar mapa
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-9.15, 39.0],
+            zoom: 9,
+            pitch: 0
+        });
+
+        // Aplicar filtros guardados aos chips
+        document.querySelectorAll('.category-chip').forEach(chip => {
+            const category = chip.dataset.category;
+            if (!categoryFilters[category]) {
+                chip.classList.remove('active');
+            }
+        });
+
+        // Toggle categorias
+        document.querySelectorAll('.category-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const category = chip.dataset.category;
+                
+                // Toggle estado
+                categoryFilters[category] = !categoryFilters[category];
+                chip.classList.toggle('active');
+                
+                // Guardar preferências
+                localStorage.setItem('categoryFilters', JSON.stringify(categoryFilters));
+                
+                // Atualizar markers no mapa
+                updateMapMarkers();
+            });
+        });
+
+        // Elementos UI
+        const bottomSheet = document.getElementById('bottom-sheet');
+        const locationName = document.getElementById('location-name');
+        const progressFill = document.getElementById('progress-fill');
+        const currentTimeEl = document.getElementById('current-time');
+        const totalTimeEl = document.getElementById('total-time');
+        const pauseBtn = document.getElementById('pause-btn');
+        const audioPlayer = document.getElementById('audio-player');
+
+        // Navegação UI
+        const navPanel = document.getElementById('nav-panel');
+        const startNavBtn = document.getElementById('start-nav-btn');
+        const stopNavBtn = document.getElementById('stop-nav-btn');
+        const distanceLeftEl = document.getElementById('distance-left');
+        const timeLeftEl = document.getElementById('time-left');
+
+        // Popup confirmação áudio
+        const audioPrompt = document.getElementById('audio-prompt');
+        const promptLocation = document.getElementById('prompt-location');
+        const promptYes = document.getElementById('prompt-yes');
+        const promptNo = document.getElementById('prompt-no');
+        let currentPromptPoint = null;
+        let promptTimeout = null;
+
+        let userMarker = null;
+        let currentAudio = null;
+
+        // Inicializar localização ao carregar
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const { latitude, longitude } = position.coords;
+                    userLocation = [longitude, latitude];
+                    
+                    // Criar marker inicial
+                    updateUserMarker(longitude, latitude, 0);
+                    
+                    // Centrar mapa na localização
+                    map.setCenter([longitude, latitude]);
+                },
+                error => {
+                    console.error('Geolocalização:', error);
+                    // Desenhar rota padrão se falhar
+                    drawRoute([-9.3813, 39.3558]);
+                }
+            );
+        }
+
+        // Botão pause
+        function checkProximity(userLat, userLng) {
+            historicalPoints.forEach(point => {
+                if (!point.prompted && shouldShowPoint(point)) {
+                    const distance = getDistance(userLat, userLng, point.lat, point.lng);
+                    if (distance <= point.radius) {
+                        showAudioPrompt(point);
+                        point.prompted = true;
+                    }
+                }
+            });
+        }
+
+        function showAudioPrompt(point) {
+            currentPromptPoint = point;
+            promptLocation.textContent = point.name;
+            audioPrompt.classList.add('show');
+            
+            // Auto-dismiss após 10 segundos
+            clearTimeout(promptTimeout);
+            promptTimeout = setTimeout(() => {
+                hideAudioPrompt();
+            }, 10000);
+        }
+
+        function hideAudioPrompt() {
+            audioPrompt.classList.remove('show');
+            clearTimeout(promptTimeout);
+            currentPromptPoint = null;
+        }
+
+        // Botões popup
+        promptYes.addEventListener('click', () => {
+            if (currentPromptPoint) {
+                hideAudioPrompt();
+                playAudio(currentPromptPoint);
+                currentPromptPoint.played = true;
+            }
+        });
+
+        promptNo.addEventListener('click', () => {
+            hideAudioPrompt();
+        });
+
+        // Calcular distância (Haversine)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // raio da Terra em metros
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        // Reproduzir áudio
+        function playAudio(point) {
+            currentAudio = point;
+            locationName.textContent = point.name;
+            
+            // Mensagem personalizada por ponto
+            let message;
+            if (point.name === "Praia de Carcavelos") {
+                message = "Estás perto da Praia de Carcavelos, uma das praias mais famosas da região de Lisboa, conhecida pelo surf e pela sua extensa faixa de areia dourada.";
+            } else {
+                message = `Estás perto de ${point.name}. Aqui aconteceu um importante evento histórico.`;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = 'pt-PT';
+            utterance.rate = 0.9;
+            
+            speechSynthesis.speak(utterance);
+            
+            bottomSheet.classList.add('active');
+            
+            // Simular progresso
+            let progress = 0;
+            const duration = message.length / 15; // segundos baseado no tamanho
+            const interval = setInterval(() => {
+                progress += 1;
+                progressFill.style.width = progress + '%';
+                currentTimeEl.textContent = formatTime(progress / 100 * duration);
+                totalTimeEl.textContent = formatTime(duration);
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        bottomSheet.classList.remove('active');
+                    }, 1000);
+                }
+            }, duration * 10);
+        }
+
+        // Botão pause
+        pauseBtn.addEventListener('click', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                pauseBtn.textContent = 'Retomar';
+            } else {
+                pauseBtn.textContent = 'Pausar';
+            }
+        });
+
+        // Toggle modo mapa (4 modos)
+        layersBtn.addEventListener('click', () => {
+            // Ciclar: normal → night → historic → atlas → normal
+            if (mapMode === 'normal') {
+                mapMode = 'night';
+                layersBtn.textContent = '🌙 Noite';
+                document.body.classList.remove('historic', 'atlas');
+                document.body.classList.add('night');
+                map.setStyle('mapbox://styles/mapbox/dark-v11');
+            } else if (mapMode === 'night') {
+                mapMode = 'historic';
+                layersBtn.textContent = '📜 Histórico';
+                document.body.classList.remove('night', 'atlas');
+                document.body.classList.add('historic');
+                map.setStyle('mapbox://styles/mapbox/streets-v12');
+            } else if (mapMode === 'historic') {
+                mapMode = 'atlas';
+                layersBtn.textContent = '🏺 Atlas';
+                document.body.classList.remove('night', 'historic');
+                document.body.classList.add('atlas');
+                map.setStyle('mapbox://styles/mapbox/light-v11');
+            } else {
+                mapMode = 'normal';
+                layersBtn.textContent = '🗺️ Normal';
+                document.body.classList.remove('night', 'historic', 'atlas');
+                map.setStyle('mapbox://styles/mapbox/streets-v12');
+            }
+        });
+
+        // Botão localização
+        locateBtn.addEventListener('click', () => {
+            if (userMarker) {
+                const lngLat = userMarker.getLngLat();
+                map.flyTo({
+                    center: [lngLat.lng, lngLat.lat],
+                    zoom: 14
+                });
+            }
+        });
+
+        // Controlos zoom
+        zoomInBtn.addEventListener('click', () => {
+            map.zoomIn();
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            map.zoomOut();
+        });
+
+        // Toggle vista 2D/3D
+        viewToggle.addEventListener('click', () => {
+            is3DView = !is3DView;
+            viewToggle.textContent = is3DView ? '🗺️' : '🏔️';
+            
+            if (isNavigating) {
+                map.easeTo({
+                    pitch: is3DView ? 60 : 0,
+                    duration: 500
+                });
+            }
+        });
+
+        // Search box interaction
+        searchBox.addEventListener('click', () => {
+            destinationName.style.display = 'none';
+            destinationInput.style.display = 'block';
+            destinationInput.focus();
+        });
+
+        // Geocoding autocomplete
+        let searchTimeout;
+        destinationInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                autocompleteEl.style.display = 'none';
+                return;
+            }
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchPlaces(query);
+            }, 300);
+        });
+
+        async function searchPlaces(query) {
+            try {
+                const response = await fetch(
+                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+                    `access_token=${mapboxgl.accessToken}&` +
+                    `country=PT&` +
+                    `language=pt&` +
+                    `limit=5`
+                );
+                
+                const data = await response.json();
+                
+                if (data.features && data.features.length > 0) {
+                    displayAutocomplete(data.features);
+                } else {
+                    autocompleteEl.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Erro geocoding:', error);
+            }
+        }
+
+        function displayAutocomplete(places) {
+            autocompleteEl.innerHTML = '';
+            
+            places.forEach(place => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                
+                const name = document.createElement('div');
+                name.className = 'place-name';
+                name.textContent = place.text;
+                
+                const address = document.createElement('div');
+                address.className = 'place-address';
+                address.textContent = place.place_name;
+                
+                item.appendChild(name);
+                item.appendChild(address);
+                
+                item.addEventListener('click', () => {
+                    selectDestination(place);
+                });
+                
+                autocompleteEl.appendChild(item);
+            });
+            
+            autocompleteEl.style.display = 'block';
+        }
+
+        function selectDestination(place) {
+            currentDestination = {
+                name: place.text,
+                coords: place.center
+            };
+            
+            destinationName.textContent = place.text;
+            destinationName.style.display = 'block';
+            destinationInput.style.display = 'none';
+            destinationInput.value = '';
+            autocompleteEl.style.display = 'none';
+            
+            // Centrar mapa no destino
+            map.flyTo({
+                center: place.center,
+                zoom: 8,
+                duration: 1500
+            });
+            
+            // Desenhar rota e gerar pontos
+            drawRoute(place.center);
+        }
+
+        async function drawRoute(destCoords) {
+            // Usar localização atual se disponível, senão Lisboa
+            const origin = userLocation || [-9.1393, 38.7223];
+            
+            try {
+                const response = await fetch(
+                    `https://api.mapbox.com/directions/v5/mapbox/driving/${origin[0]},${origin[1]};${destCoords[0]},${destCoords[1]}?` +
+                    `geometries=geojson&` +
+                    `overview=full&` +
+                    `steps=true&` +
+                    `continue_straight=false&` +
+                    `access_token=${mapboxgl.accessToken}`
+                );
+                
+                const data = await response.json();
+                
+                if (data.routes && data.routes[0]) {
+                    const route = data.routes[0];
+                    currentRoute = route;
+                    
+                    // Remover rota anterior se existir
+                    if (map.getSource('route')) {
+                        map.removeLayer('route');
+                        map.removeSource('route');
+                    }
+                    
+                    // Adicionar rota ao mapa com geometria completa
+                    map.addSource('route', {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            properties: {},
+                            geometry: route.geometry
+                        }
+                    });
+                    
+                    map.addLayer({
+                        id: 'route',
+                        type: 'line',
+                        source: 'route',
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': '#4285f4',
+                            'line-width': 6,
+                            'line-opacity': 0.9
+                        }
+                    });
+                    
+                    // Gerar pontos ao longo da rota
+                    generateRoutePoints(route.geometry.coordinates);
+                    
+                    // Ajustar vista para mostrar rota completa
+                    const coordinates = route.geometry.coordinates;
+                    const bounds = coordinates.reduce((bounds, coord) => {
+                        return bounds.extend(coord);
+                    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+                    
+                    map.fitBounds(bounds, {
+                        padding: 80,
+                        duration: 1500
+                    });
+                    
+                    // Mostrar painel navegação
+                    navPanel.classList.add('active');
+                    updateNavStats();
+                }
+            } catch (error) {
+                console.error('Erro ao desenhar rota:', error);
+            }
+        }
+
+        function generateRoutePoints(routeCoordinates) {
+            // Limpar pontos antigos
+            historicalPoints.length = 0;
+            document.querySelectorAll('.marker').forEach(el => el.remove());
+            
+            // Selecionar 4 pontos ao longo da rota
+            const totalPoints = routeCoordinates.length;
+            const numPoints = 4;
+            
+            // Categorias possíveis para pontos gerados
+            const possibleCategories = [
+                ["historia", "arquitetura"],
+                ["natureza"],
+                ["gastronomia", "curiosidades"],
+                ["historia"]
+            ];
+            
+            for (let i = 1; i <= numPoints; i++) {
+                const index = Math.floor((totalPoints / (numPoints + 1)) * i);
+                const coord = routeCoordinates[index];
+                
+                const point = {
+                    id: i,
+                    name: `Ponto Histórico ${i}`,
+                    lat: coord[1],
+                    lng: coord[0],
+                    radius: 300,
+                    audio: `audio${i}.mp3`,
+                    categories: possibleCategories[i - 1] || ["curiosidades"],
+                    played: false,
+                    prompted: false
+                };
+                
+                historicalPoints.push(point);
+                
+                // Só adicionar marker se categoria ativa
+                if (shouldShowPoint(point)) {
+                    addMarker(point);
+                }
+            }
+        }
+
+        function shouldShowPoint(point) {
+            // Verificar se pelo menos uma categoria do ponto está ativa
+            return point.categories.some(cat => categoryFilters[cat]);
+        }
+
+        function addMarker(point) {
+            const el = document.createElement('div');
+            el.className = 'marker';
+            el.dataset.pointId = point.id;
+            new mapboxgl.Marker(el)
+                .setLngLat([point.lng, point.lat])
+                .addTo(map);
+        }
+
+        function updateMapMarkers() {
+            // Remover todos markers
+            document.querySelectorAll('.marker').forEach(el => el.remove());
+            
+            // Adicionar apenas markers com categorias ativas
+            historicalPoints.forEach(point => {
+                if (shouldShowPoint(point)) {
+                    addMarker(point);
+                }
+            });
+        }
+
+        // Fechar autocomplete ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!searchBox.contains(e.target) && !autocompleteEl.contains(e.target)) {
+                destinationName.style.display = 'block';
+                destinationInput.style.display = 'none';
+                destinationInput.value = '';
+                autocompleteEl.style.display = 'none';
+            }
+        });
+
+        // Iniciar navegação
+        startNavBtn.addEventListener('click', () => {
+            if (!currentRoute) return;
+            
+            isNavigating = true;
+            startNavBtn.style.display = 'none';
+            stopNavBtn.style.display = 'block';
+            
+            // Mostrar botão vista
+            viewToggle.classList.add('active');
+            
+            // Iniciar tracking GPS contínuo
+            startGPSTracking();
+            
+            // Modo navegação: seguir user
+            map.flyTo({
+                center: userLocation || currentRoute.geometry.coordinates[0],
+                zoom: 16,
+                pitch: is3DView ? 60 : 0,
+                bearing: userBearing
+            });
+        });
+
+        // Parar navegação
+        stopNavBtn.addEventListener('click', () => {
+            stopNavigation();
+        });
+
+        function stopNavigation() {
+            isNavigating = false;
+            startNavBtn.style.display = 'block';
+            stopNavBtn.style.display = 'none';
+            
+            // Esconder botão vista
+            viewToggle.classList.remove('active');
+            
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            // Voltar vista normal
+            map.flyTo({
+                pitch: 0,
+                bearing: 0,
+                zoom: 10
+            });
+        }
+
+        function startGPSTracking() {
+            if (!navigator.geolocation) return;
+            
+            watchId = navigator.geolocation.watchPosition(
+                position => {
+                    const { latitude, longitude, heading } = position.coords;
+                    userLocation = [longitude, latitude];
+                    userBearing = heading || 0;
+                    
+                    // Atualizar marker
+                    updateUserMarker(longitude, latitude, heading);
+                    
+                    if (isNavigating) {
+                        // Seguir utilizador
+                        map.setCenter([longitude, latitude]);
+                        if (heading !== null) {
+                            map.setBearing(heading);
+                        }
+                        
+                        // Manter pitch conforme preferência
+                        if (map.getPitch() !== (is3DView ? 60 : 0)) {
+                            map.setPitch(is3DView ? 60 : 0);
+                        }
+                        
+                        // Atualizar stats
+                        updateNavStats();
+                        
+                        // Verificar proximidade pontos
+                        checkProximity(latitude, longitude);
+                    }
+                },
+                error => console.error('GPS erro:', error),
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 5000
+                }
+            );
+        }
+
+        function updateUserMarker(lng, lat, heading) {
+            if (!userMarker) {
+                const el = document.createElement('div');
+                el.className = isNavigating ? 'user-marker-nav' : 'user-marker';
+                userMarker = new mapboxgl.Marker(el)
+                    .setLngLat([lng, lat])
+                    .addTo(map);
+            } else {
+                userMarker.setLngLat([lng, lat]);
+                
+                // Rodar seta na navegação
+                if (isNavigating && heading !== null) {
+                    const el = userMarker.getElement();
+                    el.className = 'user-marker-nav';
+                    el.style.transform = `rotate(${heading}deg)`;
+                }
+            }
+        }
+
+        function updateNavStats() {
+            if (!currentRoute || !userLocation) return;
+            
+            // Calcular distância até destino
+            const destCoords = currentDestination.coords;
+            const distance = getDistance(
+                userLocation[1], userLocation[0],
+                destCoords[1], destCoords[0]
+            );
+            
+            // Formatar distância
+            if (distance < 1000) {
+                distanceLeftEl.textContent = Math.round(distance) + ' m';
+            } else {
+                distanceLeftEl.textContent = (distance / 1000).toFixed(1) + ' km';
+            }
+            
+            // Estimar tempo (60 km/h média)
+            const timeMinutes = Math.round((distance / 1000) / 60 * 60);
+            if (timeMinutes < 60) {
+                timeLeftEl.textContent = timeMinutes + ' min';
+            } else {
+                const hours = Math.floor(timeMinutes / 60);
+                const mins = timeMinutes % 60;
+                timeLeftEl.textContent = `${hours}h ${mins}m`;
+            }
+        }
+
+        // Helpers
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
