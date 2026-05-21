@@ -1,1729 +1,1945 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-PT">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Historic Maps</title>
-    <link rel="manifest" href="manifest.json">
-    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Roboto, Arial, sans-serif;
-            background: #e5e3df;
-            overflow: hidden;
-            height: 100vh;
-        }
-
-        body.night {
-            background: #202124;
-        }
-
-        #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 100%;
-        }
-
-        /* Search box estilo Google Maps */
-        #search-box {
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            right: 16px;
-            z-index: 1000;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            padding: 12px 16px;
-            gap: 12px;
-            cursor: pointer;
-        }
-
-        body.night #search-box {
-            background: #292a2d;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-        }
-
-        body.historic #search-box {
-            background: #f4e9d7;
-            box-shadow: 0 2px 6px rgba(92, 74, 58, 0.3);
-            border: 1px solid #d4b896;
-        }
-
-        body.atlas #search-box {
-            background: #efe6d6;
-            box-shadow: 0 2px 6px rgba(92, 74, 58, 0.2);
-            border: 1px solid #d8d0c0;
-        }
-
-        #destination-label {
-            font-size: 14px;
-            color: #70757a;
-        }
-
-        body.night #destination-label {
-            color: #9aa0a6;
-        }
-
-        body.historic #destination-label {
-            color: #8b7355;
-        }
-
-        body.atlas #destination-label {
-            color: #8b7355;
-        }
-
-        #destination-name {
-            font-size: 16px;
-            font-weight: 500;
-            color: #202124;
-            flex: 1;
-        }
-
-        body.night #destination-name {
-            color: #e8eaed;
-        }
-
-        body.historic #destination-name {
-            color: #5c4a3a;
-        }
-
-        body.atlas #destination-name {
-            color: #5c4a3a;
-        }
-
-        #destination-input {
-            display: none;
-            flex: 1;
-            border: none;
-            outline: none;
-            font-size: 16px;
-            font-weight: 500;
-            color: #202124;
-            background: transparent;
-        }
-
-        body.night #destination-input {
-            color: #e8eaed;
-        }
-
-        #destination-input::placeholder {
-            color: #70757a;
-        }
-
-        body.night #destination-input::placeholder {
-            color: #9aa0a6;
-        }
-
-        /* Filtros de categorias */
-        #category-filters {
-            position: fixed;
-            top: 80px;
-            left: 16px;
-            right: 16px;
-            z-index: 1000;
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-
-        #category-filters::-webkit-scrollbar {
-            display: none;
-        }
-
-        .category-chip {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            background: white;
-            border: 2px solid #e8eaed;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #5f6368;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
-            user-select: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        body.night .category-chip {
-            background: #292a2d;
-            border-color: #3c4043;
-            color: #9aa0a6;
-        }
-
-        body.historic .category-chip {
-            background: #f4e9d7;
-            border-color: #d4b896;
-            color: #5c4a3a;
-        }
-
-        body.atlas .category-chip {
-            background: #efe6d6;
-            border-color: #d8d0c0;
-            color: #5c4a3a;
-        }
-
-        .category-chip.active {
-            background: #1a73e8;
-            border-color: #1a73e8;
-            color: white;
-        }
-
-        body.night .category-chip.active {
-            background: #8ab4f8;
-            border-color: #8ab4f8;
-            color: #202124;
-        }
-
-        body.historic .category-chip.active {
-            background: #8b6f47;
-            border-color: #8b6f47;
-            color: #fff8e7;
-        }
-
-        body.atlas .category-chip.active {
-            background: #b07a3b;
-            border-color: #b07a3b;
-            color: #efe6d6;
-        }
-
-        .category-chip:active {
-            transform: scale(0.96);
-        }
-
-        .category-icon {
-            font-size: 16px;
-        }
-
-        /* Autocomplete dropdown */
-        #autocomplete {
-            position: fixed;
-            top: 80px;
-            left: 16px;
-            right: 16px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-            z-index: 1001;
-        }
-
-        body.night #autocomplete {
-            background: #292a2d;
-        }
-
-        .autocomplete-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #f1f3f4;
-        }
-
-        body.night .autocomplete-item {
-            border-bottom: 1px solid #3c4043;
-        }
-
-        .autocomplete-item:hover {
-            background: #f1f3f4;
-        }
-
-        body.night .autocomplete-item:hover {
-            background: #3c4043;
-        }
-
-        .autocomplete-item:last-child {
-            border-bottom: none;
-        }
-
-        .place-name {
-            font-size: 15px;
-            color: #202124;
-            font-weight: 500;
-        }
-
-        body.night .place-name {
-            color: #e8eaed;
-        }
-
-        .place-address {
-            font-size: 13px;
-            color: #70757a;
-            margin-top: 2px;
-        }
-
-        body.night .place-address {
-            color: #9aa0a6;
-        }
-
-        /* Controlo layers (modo mapa) */
-        #layers-btn {
-            position: fixed;
-            top: 90px;
-            right: 16px;
-            z-index: 1000;
-            min-width: 100px;
-            height: 40px;
-            background: white;
-            border: none;
-            border-radius: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 16px;
-            color: #202124;
-        }
-
-        body.night #layers-btn {
-            background: #292a2d;
-            color: #e8eaed;
-        }
-
-        body.historic #layers-btn {
-            background: #f4e9d7;
-            color: #5c4a3a;
-        }
-
-        body.atlas #layers-btn {
-            background: #efe6d6;
-            color: #5c4a3a;
-        }
-
-        /* Filtro sépia para modo histórico */
-        body.historic #map {
-            filter: sepia(0.3) saturate(0.8) contrast(1.1);
-        }
-
-        body.historic .mapboxgl-ctrl-logo {
-            filter: grayscale(1) opacity(0.5);
-        }
-
-        /* Filtro atlas editorial */
-        body.atlas #map {
-            filter: saturate(0.75) contrast(1.05);
-        }
-
-        body.atlas .mapboxgl-ctrl-logo {
-            filter: grayscale(1) opacity(0.4);
-        }
-
-        /* Controlos zoom estilo Google Maps */
-        #zoom-controls {
-            position: fixed;
-            bottom: 240px;
-            right: 16px;
-            z-index: 1000;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-
-        body.night #zoom-controls {
-            background: #292a2d;
-        }
-
-        .zoom-btn {
-            width: 40px;
-            height: 40px;
-            background: white;
-            border: none;
-            cursor: pointer;
-            font-size: 20px;
-            color: #5f6368;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-bottom: 1px solid #e8eaed;
-        }
-
-        body.night .zoom-btn {
-            background: #292a2d;
-            color: #9aa0a6;
-            border-bottom-color: #3c4043;
-        }
-
-        body.historic .zoom-btn {
-            background: #f4e9d7;
-            color: #5c4a3a;
-            border-bottom-color: #d4b896;
-        }
-
-        body.atlas .zoom-btn {
-            background: #efe6d6;
-            color: #5c4a3a;
-            border-bottom-color: #d8d0c0;
-        }
-
-        .zoom-btn:last-child {
-            border-bottom: none;
-        }
-
-        .zoom-btn:active {
-            background: #f1f3f4;
-        }
-
-        body.night .zoom-btn:active {
-            background: #3c4043;
-        }
-
-        body.historic .zoom-btn:active {
-            background: #e8dcc4;
-        }
-
-        body.atlas .zoom-btn:active {
-            background: #e5ddc8;
-        }
-
-        /* Botão vista 2D/3D */
-        #view-toggle {
-            position: fixed;
-            bottom: 320px;
-            right: 16px;
-            z-index: 1000;
-            width: 40px;
-            height: 40px;
-            background: white;
-            border: none;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            font-size: 18px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-
-        body.night #view-toggle {
-            background: #292a2d;
-        }
-
-        #view-toggle.active {
-            display: flex;
-        }
-
-        /* Botão localização */
-        #locate-btn {
-            position: fixed;
-            bottom: 180px;
-            right: 16px;
-            z-index: 1000;
-            width: 40px;
-            height: 40px;
-            background: white;
-            border: none;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        body.night #locate-btn {
-            background: #292a2d;
-        }
-
-        /* Markers */
-        .marker {
-            width: 24px;
-            height: 24px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23ea4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle fill="white" cx="12" cy="9" r="2.5"/></svg>');
-            background-size: contain;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .marker:hover {
-            transform: scale(1.15);
-        }
-
-        .user-marker {
-            width: 18px;
-            height: 18px;
-            background: #4285f4;
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 0 1px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3);
-        }
-
-        /* Bottom sheet - estilo Google Maps */
-        #bottom-sheet {
-            position: fixed;
-            bottom: -300px;
-            left: 0;
-            right: 0;
-            background: white;
-            border-radius: 16px 16px 0 0;
-            box-shadow: 0 -2px 16px rgba(0,0,0,0.2);
-            z-index: 1000;
-            transition: bottom 0.3s ease;
-            max-height: 50vh;
-        }
-
-        body.night #bottom-sheet {
-            background: #292a2d;
-        }
-
-        #bottom-sheet.active {
-            bottom: 0;
-        }
-
-        #sheet-handle {
-            width: 40px;
-            height: 4px;
-            background: #dadce0;
-            border-radius: 2px;
-            margin: 12px auto;
-        }
-
-        body.night #sheet-handle {
-            background: #5f6368;
-        }
-
-        #sheet-content {
-            padding: 0 20px 20px;
-        }
-
-        #location-name {
-            font-size: 20px;
-            font-weight: 500;
-            color: #202124;
-            margin-bottom: 8px;
-        }
-
-        body.night #location-name {
-            color: #e8eaed;
-        }
-
-        #now-playing {
-            font-size: 12px;
-            color: #5f6368;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 16px;
-        }
-
-        body.night #now-playing {
-            color: #9aa0a6;
-        }
-
-        #progress-bar {
-            width: 100%;
-            height: 4px;
-            background: #e8eaed;
-            border-radius: 2px;
-            margin-bottom: 8px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        body.night #progress-bar {
-            background: #3c4043;
-        }
-
-        #progress-fill {
-            height: 100%;
-            background: #1a73e8;
-            width: 0%;
-            transition: width 0.1s linear;
-        }
-
-        body.night #progress-fill {
-            background: #8ab4f8;
-        }
-
-        #time-display {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #5f6368;
-            margin-bottom: 16px;
-        }
-
-        body.night #time-display {
-            color: #9aa0a6;
-        }
-
-        #controls {
-            display: flex;
-            gap: 16px;
-        }
-
-        .control-btn {
-            flex: 1;
-            padding: 10px;
-            background: #f1f3f4;
-            border: none;
-            border-radius: 20px;
-            color: #5f6368;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        body.night .control-btn {
-            background: #3c4043;
-            color: #9aa0a6;
-        }
-
-        .control-btn.primary {
-            background: #1a73e8;
-            color: white;
-        }
-
-        body.night .control-btn.primary {
-            background: #8ab4f8;
-            color: #202124;
-        }
-
-        /* Navigation panel */
-        #nav-panel {
-            position: fixed;
-            bottom: 16px;
-            left: 16px;
-            right: 16px;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            padding: 20px;
-            z-index: 999;
-            display: none;
-        }
-
-        body.night #nav-panel {
-            background: #292a2d;
-        }
-
-        body.historic #nav-panel {
-            background: #f4e9d7;
-            border: 2px solid #d4b896;
-        }
-
-        body.atlas #nav-panel {
-            background: #efe6d6;
-            border: 2px solid #d8d0c0;
-        }
-
-        #nav-panel.active {
-            display: block;
-        }
-
-        #nav-info {
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 16px;
-        }
-
-        .nav-stat {
-            text-align: center;
-        }
-
-        .nav-stat-label {
-            font-size: 11px;
-            color: #5f6368;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        body.night .nav-stat-label {
-            color: #9aa0a6;
-        }
-
-        body.historic .nav-stat-label {
-            color: #8b7355;
-        }
-
-        body.atlas .nav-stat-label {
-            color: #8b7355;
-        }
-
-        .nav-stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #202124;
-            margin-top: 4px;
-        }
-
-        body.night .nav-stat-value {
-            color: #e8eaed;
-        }
-
-        body.historic .nav-stat-value {
-            color: #5c4a3a;
-        }
-
-        body.atlas .nav-stat-value {
-            color: #5c4a3a;
-        }
-
-        #start-nav-btn, #stop-nav-btn {
-            width: 100%;
-            padding: 14px;
-            background: #1a73e8;
-            color: white;
-            border: none;
-            border-radius: 24px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        #stop-nav-btn {
-            background: #ea4335;
-        }
-
-        body.night #start-nav-btn {
-            background: #8ab4f8;
-            color: #202124;
-        }
-
-        body.night #stop-nav-btn {
-            background: #f28b82;
-            color: #202124;
-        }
-
-        body.historic #start-nav-btn {
-            background: #8b6f47;
-            color: #fff8e7;
-        }
-
-        body.historic #stop-nav-btn {
-            background: #c17e4a;
-            color: #fff8e7;
-        }
-
-        body.atlas #start-nav-btn {
-            background: #b07a3b;
-            color: #efe6d6;
-        }
-
-        body.atlas #stop-nav-btn {
-            background: #d48c4a;
-            color: #efe6d6;
-        }
-
-        /* User marker navigation - seta */
-        .user-marker-nav {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 20px solid #4285f4;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-            transform-origin: 50% 80%;
-        }
-
-        /* Popup confirmação áudio */
-        #audio-prompt {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            padding: 24px;
-            z-index: 2000;
-            max-width: 320px;
-            width: calc(100% - 32px);
-            display: none;
-            animation: slideUp 0.3s ease;
-        }
-
-        body.night #audio-prompt {
-            background: #292a2d;
-        }
-
-        body.historic #audio-prompt {
-            background: #f4e9d7;
-            border: 2px solid #d4b896;
-        }
-
-        body.atlas #audio-prompt {
-            background: #efe6d6;
-            border: 2px solid #d8d0c0;
-        }
-
-        #audio-prompt.show {
-            display: block;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translate(-50%, -40%);
-                opacity: 0;
-            }
-            to {
-                transform: translate(-50%, -50%);
-                opacity: 1;
-            }
-        }
-
-        #prompt-title {
-            font-size: 14px;
-            color: #5f6368;
-            margin-bottom: 8px;
-        }
-
-        body.night #prompt-title {
-            color: #9aa0a6;
-        }
-
-        body.historic #prompt-title,
-        body.atlas #prompt-title {
-            color: #8b7355;
-        }
-
-        #prompt-location {
-            font-size: 18px;
-            font-weight: 600;
-            color: #202124;
-            margin-bottom: 20px;
-        }
-
-        body.night #prompt-location {
-            color: #e8eaed;
-        }
-
-        body.historic #prompt-location,
-        body.atlas #prompt-location {
-            color: #5c4a3a;
-        }
-
-        #prompt-buttons {
-            display: flex;
-            gap: 12px;
-        }
-
-        .prompt-btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 24px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        #prompt-yes {
-            background: #1a73e8;
-            color: white;
-        }
-
-        body.night #prompt-yes {
-            background: #8ab4f8;
-            color: #202124;
-        }
-
-        body.historic #prompt-yes {
-            background: #8b6f47;
-            color: #fff8e7;
-        }
-
-        body.atlas #prompt-yes {
-            background: #b07a3b;
-            color: #efe6d6;
-        }
-
-        #prompt-no {
-            background: #f1f3f4;
-            color: #5f6368;
-        }
-
-        body.night #prompt-no {
-            background: #3c4043;
-            color: #9aa0a6;
-        }
-
-        body.historic #prompt-no,
-        body.atlas #prompt-no {
-            background: rgba(92, 74, 58, 0.1);
-            color: #5c4a3a;
-        }
-
-        .prompt-btn:active {
-            transform: scale(0.96);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Acto I">
+<meta name="theme-color" content="#1a1614">
+<title>Manuscrito — Acto I</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #1a1614;
+  --bg-elevated: #221d1a;
+  --bg-popup: #2a2420;
+  --text: #e8dccb;
+  --text-soft: #b8aa97;
+  --text-faint: #6a5f54;
+  --border: #2e2823;
+  --accent: #c9a574;
+  --duvida: #d4a83e;
+  --cortar: #c0584e;
+  --naopercebo: #6f8caf;
+  --nota: #7a9970;
+  --duvida-bg: rgba(212, 168, 62, 0.18);
+  --cortar-bg: rgba(192, 88, 78, 0.18);
+  --naopercebo-bg: rgba(111, 140, 175, 0.18);
+  --nota-bg: rgba(122, 153, 112, 0.18);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+  font-size: 17px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 1.125rem;
+  line-height: 1.75;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  padding-bottom: 80px;
+}
+
+.progress {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 100;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: rgba(26, 22, 20, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 90;
+  border-bottom: 1px solid var(--border);
+  padding: env(safe-area-inset-top, 12px) 20px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.topbar-title {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.topbar-chapter {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 90px 24px 60px;
+}
+
+.chapter-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 5.5rem;
+  font-weight: 400;
+  text-align: center;
+  margin: 4rem 0 0.5rem;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  line-height: 1;
+}
+
+.chapter-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem;
+  font-weight: 400;
+  text-align: center;
+  margin: 0 0 4rem;
+  color: var(--text-soft);
+  letter-spacing: 0.05em;
+}
+
+.chapter-title em { font-style: italic; }
+
+h1:not(.chapter-num), h2:not(.chapter-title), h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 2.5rem;
+}
+
+p {
+  margin: 0 0 1.3rem;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+p em, em {
+  font-style: italic;
+  color: var(--text);
+}
+
+strong { font-weight: 600; }
+
+hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 3rem auto;
+  width: 30%;
+  position: relative;
+}
+
+hr::after {
+  content: '✦';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg);
+  color: var(--text-faint);
+  padding: 0 0.8rem;
+  font-size: 0.8rem;
+}
+
+blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1.2rem;
+  color: var(--text-soft);
+  font-style: italic;
+  margin: 1.5rem 0;
+}
+
+/* Highlights */
+.h-duvida { background: var(--duvida-bg); border-bottom: 2px solid var(--duvida); cursor: pointer; padding: 1px 0; }
+.h-cortar { background: var(--cortar-bg); border-bottom: 2px solid var(--cortar); cursor: pointer; padding: 1px 0; text-decoration: line-through; text-decoration-color: var(--cortar); }
+.h-naopercebo { background: var(--naopercebo-bg); border-bottom: 2px solid var(--naopercebo); cursor: pointer; padding: 1px 0; }
+.h-nota { background: var(--nota-bg); border-bottom: 2px solid var(--nota); cursor: pointer; padding: 1px 0; }
+
+/* Selection popup */
+.selection-popup {
+  position: fixed;
+  background: var(--bg-popup);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  display: none;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: 280px;
+}
+
+.selection-popup.visible { display: flex; }
+
+.sp-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.sp-btn:active { transform: scale(0.95); }
+
+.sp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sp-dot.dot-duvida { background: var(--duvida); }
+.sp-dot.dot-cortar { background: var(--cortar); }
+.sp-dot.dot-naopercebo { background: var(--naopercebo); }
+.sp-dot.dot-nota { background: var(--nota); }
+
+/* Existing-highlight popup */
+.existing-popup {
+  position: fixed;
+  background: var(--bg-popup);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  display: none;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.existing-popup.visible { display: block; }
+
+.existing-popup textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px;
+  border-radius: 6px;
+  font-family: 'EB Garamond', serif;
+  font-size: 0.95rem;
+  resize: vertical;
+  min-height: 60px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.existing-popup-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.existing-popup-actions button {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.existing-popup-actions button.delete {
+  color: var(--cortar);
+  border-color: var(--cortar);
+}
+
+/* Bottom bar */
+.bottombar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(26, 22, 20, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 90;
+  border-top: 1px solid var(--border);
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.bb-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  -webkit-touch-callout: none;
+}
+
+.bb-btn:active { transform: scale(0.97); }
+
+.bb-counter {
+  color: var(--text-soft);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+}
+
+.bb-counter .num {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* Sheet (overlay) */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 300;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.sheet-overlay.visible { display: block; opacity: 1; }
+
+.sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg-elevated);
+  z-index: 301;
+  border-radius: 20px 20px 0 0;
+  max-height: 80vh;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet.visible { transform: translateY(0); }
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--text-faint);
+  border-radius: 2px;
+  margin: 12px auto 0;
+}
+
+.sheet-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sheet-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.sheet-close {
+  background: none;
+  border: none;
+  color: var(--text-soft);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.sheet-body {
+  overflow-y: auto;
+  padding: 12px 24px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.annotation-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.annotation-item:last-child { border-bottom: none; }
+
+.annotation-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+.annotation-cat .sp-dot { width: 8px; height: 8px; }
+
+.annotation-text {
+  font-family: 'EB Garamond', serif;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.55;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.annotation-note {
+  font-family: 'EB Garamond', serif;
+  color: var(--text-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-top: 6px;
+}
+
+.annotation-meta {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.empty-annotations {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-faint);
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+/* Note input modal */
+.note-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 400;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.note-modal.visible { display: flex; }
+
+.note-modal-content {
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 500px;
+  width: 100%;
+  border: 1px solid var(--border);
+}
+
+.note-modal h3 {
+  margin: 0 0 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.note-modal .quoted {
+  background: var(--bg);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-style: italic;
+  color: var(--text-soft);
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+  border-left: 2px solid var(--nota);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.note-modal textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: 'EB Garamond', serif;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 100px;
+  box-sizing: border-box;
+}
+
+.note-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+.note-modal-actions button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+}
+
+.note-modal-actions button.primary {
+  background: var(--nota);
+  color: var(--bg);
+  border-color: var(--nota);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-popup);
+  color: var(--text);
+  padding: 12px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  z-index: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s;
+  white-space: nowrap;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 600px) {
+  body { font-size: 1.05rem; }
+  main { padding: 80px 18px 50px; }
+  .chapter-num { font-size: 4rem; }
+  .sp-btn { padding: 10px 14px; font-size: 1rem; }
+}
+</style>
 </head>
 <body>
-    <div id="search-box">
-        <span id="destination-label">Destino:</span>
-        <span id="destination-name">Peniche</span>
-        <input type="text" id="destination-input" placeholder="Procurar destino...">
+
+<div class="progress" id="progress"></div>
+
+<header class="topbar">
+  <div class="topbar-title">Acto I</div>
+  <div class="topbar-chapter" id="current-chapter">—</div>
+</header>
+
+<main id="content">
+<h1 data-pid="p1" class="chapter-num">I</h1>
+<p data-pid="p2">A escada cheirava a urina velha e a salitre. Cheirava assim há trinta anos, e era provável que cheirasse assim por mais trinta.</p>
+<p data-pid="p3">Diogo Severo desceu degrau a degrau, a mão esquerda encostada à parede. A direita dormia há anos. A tocha do carcereiro ia à frente, e a chama deixava no ar um fio de sebo a queimar.</p>
+<p data-pid="p4">Catorze degraus. Diogo conhecia o número de cor. Era das coisas que se aprendem.</p>
+<p data-pid="p5">Em baixo, o corredor abria-se em pedra. Estava mais frio do que devia para Setembro — pedra molhada, ar que não circulava há séculos. Quatro celas de cada lado. Do lado direito, vazias. Do lado esquerdo, três vazias e a última ocupada. De algum sítio mais ao fundo vinha uma tosse, daquelas que já não se interrompem. Diogo não virou a cabeça.</p>
+<p data-pid="p6">Pararam à frente da última cela.</p>
+<p data-pid="p7">O carcereiro era um homem velho, sem dois dentes da frente. Cheirava a queijo de cabra e a cebola crua. Diogo conhecia-o de outras vezes. Não lhe sabia o nome. Naquele trabalho havia coisas que se sabiam e outras das quais era melhor não saber.</p>
+<p data-pid="p8">— É este — disse o carcereiro.</p>
+<p data-pid="p9">— Levanta a tocha.</p>
+<p data-pid="p10">A luz tocou no fundo da cela. Diogo desdobrou o pedaço de pergaminho que trazia na manga, aproximou-o da chama, leu sem mover os lábios. Voltou a guardá-lo.</p>
+<p data-pid="p11">Olhou. Demorou-se a olhar.</p>
+<p data-pid="p12">A tocha vacilou. Diogo fez sinal e o carcereiro chegou-a mais perto das barras.</p>
+<p data-pid="p13">Primeiro, o braço.</p>
+<p data-pid="p14">Da pulseira ao cotovelo, no antebraço esquerdo, a cicatriz. Tinha tido forma, antes — alguma coisa que se desenhou com cuidado. A queimadura partira o desenho a meio. Era antiga.</p>
+<p data-pid="p15">Depois, o cabelo.</p>
+<p data-pid="p16">Escuro, a cair pela cara. Longo demais para cristão. Curto demais para mouro.</p>
+<p data-pid="p17">Diogo deu um passo atrás.</p>
+<p data-pid="p18">— É este — disse.</p>
+<p data-pid="p19">O homem na cela não respondeu. Não levantou os olhos.</p>
+<p data-pid="p20">Diogo voltou-se para o carcereiro.</p>
+<p data-pid="p21">— Há quanto tempo está aqui?</p>
+<p data-pid="p22">— Sete semanas.</p>
+<p data-pid="p23">— Tem comido?</p>
+<p data-pid="p24">— O que se lhe dá.</p>
+<p data-pid="p25">— Falou?</p>
+<p data-pid="p26">O carcereiro pensou. Coçou o queixo, onde a barba era escassa.</p>
+<p data-pid="p27">— Disse o nome no primeiro dia. Não disse mais nada desde então.</p>
+<p data-pid="p28">— Que nome disse?</p>
+<p data-pid="p29">— Já não me lembro. Não era de cristão.</p>
+<p data-pid="p30">Diogo voltou a olhar para o homem na cela. Esteve quieto durante o tempo que se demora a contar até dez. Algures, mais ao fundo, água caía em pedra. Não era a gota da cela. Era outra coisa, mais longe.</p>
+<p data-pid="p31">— Abre.</p>
+<p data-pid="p32">A fechadura era pesada e mal cuidada. O ferro raspou.</p>
+<p data-pid="p33">Diogo entrou sozinho. O carcereiro fez menção de ir atrás. Diogo levantou a mão boa. O carcereiro ficou.</p>
+<p data-pid="p34">Diogo agachou-se à frente dele. Os joelhos estalaram.</p>
+<p data-pid="p35">Em algum sítio do tecto uma gota caía. Só se ouvia agora, porque os passos tinham parado.</p>
+<p data-pid="p36">— Sabes quem sou?</p>
+<p data-pid="p37">O homem não respondeu.</p>
+<p data-pid="p38">— Sabes para onde te levo?</p>
+<p data-pid="p39">Silêncio.</p>
+<p data-pid="p40">— Tens duas formas de sair daqui. Uma é por cima dum cavalo, vivo, comigo. A outra é num saco, daqui a três dias.</p>
+<p data-pid="p41">Esperou.</p>
+<p data-pid="p42">Depois, mais baixo:</p>
+<p data-pid="p43">— Como te chamas?</p>
+<p data-pid="p44">O homem não respondeu logo.</p>
+<p data-pid="p45">Diogo esperou. Tinha o tempo todo do mundo. Algures lá em cima, muitos pisos acima, alguém arrastou alguma coisa pelo chão. O som chegou abafado, sem forma, e perdeu-se.</p>
+<p data-pid="p46">O homem ergueu os olhos pela primeira vez. A boca abriu-se a custo, como uma porta que não se abria há muito. Disse uma palavra, baixo. O carcereiro, à porta da cela, não chegou a apanhá-la.</p>
+<p data-pid="p47">Diogo ouviu.</p>
+<p data-pid="p48">Esteve um momento sem dizer nada.</p>
+<p data-pid="p49">— Bom.</p>
+<p data-pid="p50">Levantou-se devagar. As articulações estalaram.</p>
+<p data-pid="p51">— Esse nome fica aqui. Levantaste-te duma sepultura, levanta-te com nome novo. A partir de hoje és Lázaro.</p>
+<p data-pid="p52">O homem manteve o olhar. Não acenou. Não disse nada. Mas também não baixou os olhos.</p>
+<p data-pid="p53">Diogo sustentou-lhe a vista mais um momento. Depois saiu da cela. Voltou-se para o carcereiro.</p>
+<p data-pid="p54">— Levanta-o. E lava-o antes de o pôr em cima dum cavalo. Não o quero morto antes de Lisboa.</p>
+<p data-pid="p55">— Sim, senhor.</p>
+<p data-pid="p56">Diogo subiu a escada sem esperar resposta. A tocha ficou para trás. A meio dos catorze degraus parou um momento, com a mão esquerda apoiada na parede, e ouviu. Lá em baixo, o ferro a raspar de novo. O carcereiro a dizer qualquer coisa em voz baixa, no tom que se reserva aos cães velhos e aos homens acabados.</p>
+<p data-pid="p57">Subiu os outros sete.</p>
+<hr />
+<h1 data-pid="p58" class="chapter-num">II</h1>
+<p data-pid="p59">A água estava gelada.</p>
+<p data-pid="p60">Dois homens o despiram numa câmara ao lado das catacumbas. Tinha uma fresta alta na parede onde entrava luz fria, e por baixo dela uma tina de pedra com a água da noite. Não aqueceram. Não pediram licença. Despiram-no como se despe um cavalo — sem maldade nem cuidado, com o método que se aprende a fazer cinquenta vezes e a deixar de pensar.</p>
+<p data-pid="p61">A roupa caiu no chão. Cheirava a sete semanas de cela. Um dos homens pegou nela com a ponta dum pau e atirou-a para o canto. Ia ser queimada. Toda a roupa que saía daquelas celas era queimada — eram um sistema de uso único.</p>
+<p data-pid="p62">Lázaro deixou-se levar para dentro da tina. A água subiu-lhe até ao peito. Fechou os olhos um momento.</p>
+<p data-pid="p63">Esfregaram-lhe os ombros com cinza e azeite velho. A água ficou castanha e depois mais escura. Mudaram a água uma vez. Esfregaram outra vez.</p>
+<p data-pid="p64">Quando a esponja desceu pelo lado esquerdo das costelas, o homem do azeite parou.</p>
+<p data-pid="p65">Debaixo da pele suja aparecia uma marca antiga, queimada a ferro fundo. Um quadrado incompleto, com uma seta dentro a apontar para cima. Uma linha quebrada. Um ponto deslocado. O homem do azeite nunca tinha visto coisa parecida.</p>
+<p data-pid="p66">Tornou a esfregar, mais devagar. Não comentou. Quem é dado a comentar a vida não pega nestes trabalhos.</p>
+<p data-pid="p67">Quando o tiraram da tina, a pele dele estava vermelha. A marca, agora limpa, esteve à mostra o tempo de a túnica de lã crua a cobrir.</p>
+<p data-pid="p68">Deram-lhe calças, um cinto. As botas eram as dele, limpas como puderam.</p>
+<p data-pid="p69">Sentaram-no num banco de pau encostado à parede. Saíram.</p>
+<p data-pid="p70">A porta fechou-se e ficou só.</p>
+<p data-pid="p71">Havia uma mesa baixa. Em cima, três coisas: um pedaço de pão de centeio, duro nas pontas e mole no meio; uma escudela de barro com grão-de-bico em molho cinzento de alho e cebola crua, que servia mais para esconder o caldo do que para o melhorar; e um copo de barro com vinho.</p>
+<p data-pid="p72">Lázaro olhou para o pão. Estendeu a mão. Parou a meio caminho. Voltou a pousá-la em cima do joelho.</p>
+<p data-pid="p73">Esperou.</p>
+<p data-pid="p74">Comer depressa, depois de sete semanas, era o que matava os homens que sobreviviam ao resto.</p>
+<p data-pid="p75">Cortou um bocado pequeno com os dedos. Mastigou-o vinte vezes. Engoliu. Esperou. Cortou outro.</p>
+<p data-pid="p76">A escudela não lhe tocou.</p>
+<p data-pid="p77">O vinho cheirava a Douro mal aguado, e a qualquer outra coisa por baixo. Olhou para o copo. Não bebeu.</p>
+<p data-pid="p78">Lá fora, começou a chover.</p>
+<p data-pid="p79">A porta abriu-se sem aviso.</p>
+<p data-pid="p80">Diogo Severo entrou, fechou a porta atrás de si, sentou-se no banco do outro lado da mesa. Trazia a capa molhada nos ombros e o cabelo achatado pela água.</p>
+<p data-pid="p81">Não cumprimentou. Pegou na escudela com a mão esquerda, cheirou-a, voltou a pousá-la.</p>
+<p data-pid="p82">— Não comeste.</p>
+<p data-pid="p83">Silêncio.</p>
+<p data-pid="p84">— Fizeste bem. Aquele homem cozinha mal há vinte anos.</p>
+<p data-pid="p85">Diogo apoiou os antebraços na mesa. Olhou para o vinho. Não tocou.</p>
+<p data-pid="p86">— Lisboa.</p>
+<p data-pid="p87">Lázaro olhou-o.</p>
+<p data-pid="p88">— Cercada?</p>
+<p data-pid="p89">— Quatro meses. Mar e terra.</p>
+<p data-pid="p90">Diogo coçou a têmpora com a mão boa.</p>
+<p data-pid="p91">— Vão aguentar quanto?</p>
+<p data-pid="p92">— Não muito. O rei também não.</p>
+<p data-pid="p93">— E eu nisto porquê?</p>
+<p data-pid="p94">— Alguém disse ao rei que tu abriste uma porta em Edessa.</p>
+<p data-pid="p95">Lázaro pousou o pão na mesa. Olhou para o copo. Não levantou os olhos.</p>
+<p data-pid="p96">Lá fora a chuva ganhou peso no telhado.</p>
+<p data-pid="p97">— Quem disse ao rei?</p>
+<p data-pid="p98">— Não te interessa.</p>
+<p data-pid="p99">— Interessa.</p>
+<p data-pid="p100">— Interessa-te o ouro. O resto não.</p>
+<p data-pid="p101">Silêncio.</p>
+<p data-pid="p102">— Quanto?</p>
+<p data-pid="p103">— O suficiente para parares de fazer isto, se for o que quiseres.</p>
+<p data-pid="p104">— Se chegar ao fim.</p>
+<p data-pid="p105">— Se chegares ao fim.</p>
+<p data-pid="p106">Diogo encostou-se à parede. A capa molhada deixou uma marca escura na pedra atrás dele.</p>
+<p data-pid="p107">— Pensa.</p>
+<p data-pid="p108">Lázaro estendeu a mão esquerda para o copo. A mão tinha estado em cima do joelho durante todo o tempo em que falaram e não tinha tremido. Quando se levantou para o copo, começou.</p>
+<p data-pid="p109">Não muito. Uma vibração pequena, no pulso, que descia para os dedos. Pegou no copo. Levantou-o lentamente. À altura do peito, uma gota saltou pela beira e caiu na túnica. Ficou ali um momento, escura na lã crua.</p>
+<p data-pid="p110">Lázaro bebeu uma vez. Pousou o copo. A mão acalmou.</p>
+<p data-pid="p111">Diogo estava a olhar para a mão. Não comentou. Olhou para a parede atrás de Lázaro, onde uma aranha andava num passo lento.</p>
+<p data-pid="p112">— Aceitas?</p>
+<p data-pid="p113">— Aceito.</p>
+<p data-pid="p114">Diogo acenou uma vez. Levantou-se. Foi até à porta. À porta, parou sem se voltar.</p>
+<p data-pid="p115">— Come o grão-de-bico. Está mau, mas é o que vais ter por uma semana. Daqui a uma hora montas.</p>
+<p data-pid="p116">Saiu.</p>
+<p data-pid="p117">Saíram antes do sol. Coimbra cheirava a fumo frio, a estrume de cavalo, e a uma cidade que estava a ganhar o costume de se levantar antes da luz. Não voltaram a olhar para trás.</p>
+<hr />
+<p data-pid="p118"><em>Caps I-II · v4.1 FINAL · ~1740 palavras · ~8 págs · três cortes Bourdain integrados</em></p>
+<hr />
+<h1 data-pid="p119" class="chapter-num">III</h1>
+<h2 data-pid="p120" class="chapter-title"><em>A Estrada para Sul</em></h2>
+<p data-pid="p121">Lázaro acordou em cima do cavalo, e não soube por quanto tempo tinha dormido.</p>
+<p data-pid="p122">Era manhã ainda. O sol não chegara à altura das oliveiras, e os cavalos respiravam fumo branco a cada passo. Adiante, Diogo Severo ia primeiro, capa apertada, mão boa nas rédeas. Atrás dele, três soldados em fila. Atrás dos soldados, o aguadeiro com as duas pipas a tilintar molemente nas correias.</p>
+<p data-pid="p123">Lázaro endireitou-se. A sela tinha-lhe deixado marca no lado direito. Mexeu os dedos. Os dedos respondiam. Era bom sinal.</p>
+<p data-pid="p124">Um dos soldados olhou-o por cima do ombro. Era o mais novo dos três — barba ainda mal aprendida, olhos claros. Notou que Lázaro estava acordado. Quase sorriu. Não chegou a sorrir. Voltou-se para a frente.</p>
+<p data-pid="p125">— <em>Gil</em> — disse um dos outros soldados, sem virar a cabeça. — <em>Os olhos no caminho.</em></p>
+<p data-pid="p126">O mais novo coçou o pescoço com a mão livre. Os olhos voltaram para o caminho.</p>
+<p data-pid="p127">Diogo cavalgava demasiado à frente para falar. Era de propósito.</p>
+<p data-pid="p128">Cinco dias para Lisboa, com calma. Quatro se a chuva esperasse. Lázaro fez a conta sem precisar de fazer.</p>
+<hr />
+<p data-pid="p129">A primeira noite passou-a em estalagem de telhado baixo, a meio caminho de Pombal. Cheirava a porco a curar e a urina dos cães do dono. Lázaro comeu pouco. Bebeu água. Dormiu duas horas sentado contra a parede e três deitado, e a meio da segunda metade tossiu uma vez. Acordou. Voltou a dormir.</p>
+<p data-pid="p130">Na manhã seguinte, partiram antes do sol. Diogo não disse bom-dia. Os soldados também não. Havia escoltas em que se aprendia a calar como ofício, e aquela era das tais.</p>
+<p data-pid="p131">Ao fim da tarde do segundo dia, voltaram a parar. Estalagem mais pequena. Migas com bacalhau seco e azeite que estava bom — o estalajadeiro era um homem velho que punha o que tinha de melhor à frente dos que pareciam vir longe e ir mais longe. Vinho de Pombal aguado, mas vinho.</p>
+<p data-pid="p132">Diogo sentou-se à frente de Lázaro. Comeu metade do pão. Bebeu meio copo. Limpou a boca com as costas da mão boa. Quando falou foi sem subir os olhos.</p>
+<p data-pid="p133">— <em>Sabes andar de noite?</em></p>
+<p data-pid="p134">Lázaro mastigou. Engoliu.</p>
+<p data-pid="p135">— <em>Sei.</em></p>
+<p data-pid="p136">— <em>Sabes ler latim?</em></p>
+<p data-pid="p137">— <em>Sei.</em></p>
+<p data-pid="p138">Diogo acenou uma vez. Não fez mais perguntas. Acabou o vinho. Levantou-se. Foi falar com o estalajadeiro sobre cevada para os cavalos.</p>
+<p data-pid="p139">O soldado mais velho olhou para Lázaro, depois para Gil, depois outra vez para Lázaro. Não disse nada. Mas tinha aquele tipo de cara dos homens que já decidiram entre eles. Lázaro acabou as migas devagar. O azeite estava mesmo bom. Era pena.</p>
+<hr />
+<p data-pid="p140">O terceiro dia começou cinzento e acabou negro.</p>
+<p data-pid="p141">A chuva pegou-os a meio da manhã, perto de Leiria. Não foi chuva pequena. Foi de Outubro a anunciar-se em Setembro — vento de oeste a empurrar tudo a direito, gotas grossas a baterem em ângulo na lã das capas. Os cavalos baixaram a cabeça e continuaram. Era o que sabiam fazer.</p>
+<p data-pid="p142">Abrigaram-se em olival velho, num talude. As oliveiras eram baixas, retorcidas, de tronco aberto pelo tempo. A chuva caía nas folhas e fazia som de fritura. Por baixo das patas, as azeitonas caídas esmagavam-se e libertavam o cheiro doce-azedo que tinham — cheiro a azeite ainda por fazer, cheiro a outra coisa que estava por chegar.</p>
+<p data-pid="p143">Os homens apearam-se. Encostaram-se às árvores. Gil estava ao lado de Lázaro. Olhou para ele duas, três vezes. Por fim juntou coragem.</p>
+<p data-pid="p144">— <em>Disseram-me que o senhor já fez isto noutras terras.</em></p>
+<p data-pid="p145">Lázaro não respondeu.</p>
+<p data-pid="p146">— <em>Disseram-me que andou em sítios onde os mouros são piores.</em></p>
+<p data-pid="p147">Lázaro voltou os olhos. Não falou. Não fez nada com a cara. Mas Gil sentiu como se uma porta lhe tivesse sido fechada à frente — devagar, sem maldade nenhuma, mas fechada.</p>
+<p data-pid="p148">O soldado velho, do outro lado da árvore, cuspiu para o lado.</p>
+<p data-pid="p149">— <em>Não vale a pena, Gil. Eu já te avisei.</em></p>
+<p data-pid="p150">Gil baixou os olhos. Não voltou a falar até o sol descer.</p>
+<p data-pid="p151">Lázaro olhou para a chuva. Os homens falavam quando lhes faltava o que dizer; calavam-se quando tinham. A escolta calava-se de mais para não saber. Era boa escolta.</p>
+<hr />
+<p data-pid="p152">O quarto dia foi só chuva.</p>
+<p data-pid="p153">Cavalgaram quatorze horas debaixo dela. As capas dobraram o peso, depois triplicaram. As patas dos cavalos faziam som de sucção na terra. Diogo não mandou parar para almoçar. Comeram do que tinham nas alforjas — pão duro, queijo, e o grão-de-bico em molho que vinha desde Coimbra dentro duma escudela de barro embrulhada em pano.</p>
+<p data-pid="p154">Lázaro tirou o pano. O grão tinha azedado nos últimos dois dias. Tinha estado quase a esperar por isso. Comeu na mesma. Comeu devagar. Mastigou cada bocado mais do que precisava. Tinham sobrado três colheres na escudela; ele comeu duas. Pousou a terceira no chão para um cão que andava pela estrada havia uma hora a segui-los, magro como uma faca.</p>
+<p data-pid="p155">Quando levantou os olhos, Diogo estava a olhar para ele. Diogo voltou-se para a estrada e não comentou.</p>
+<p data-pid="p156">A meio da tarde, Lázaro tossiu. Uma vez só, seca, vinda do fundo do peito. Diogo olhou-o por cima do ombro. Não disse nada. Voltou a olhar em frente.</p>
+<p data-pid="p157">Quando pararam à noite — sob um anexo abandonado de um lavrador morto, dizia o sargento — Diogo foi até ao aguadeiro e mandou-o fazer uma infusão de qualquer coisa que sabia fazer. Não disse para quem era. O aguadeiro também não perguntou. Trouxe a caneca a Lázaro com a desculpa de que era para o frio. Lázaro bebeu. Estava amargo. Estava bom.</p>
+<p data-pid="p158">Tirou as botas. Estendeu-se no enxergão de palha. Dormiu seis horas seguidas. Não acordou para tossir.</p>
+<hr />
+<p data-pid="p159">O quinto dia desceu para a planície a meio da tarde.</p>
+<p data-pid="p160">Saíram do pinhal alto e a terra abriu-se à frente deles em folhas castanhas e amarelas que iam até onde a vista chegasse. O sol tinha-se rendido a meio dia mas a chuva tinha parado. O vento veio mudado.</p>
+<p data-pid="p161">Lázaro respirou. Não disse nada.</p>
+<p data-pid="p162">Era estuário. Ainda não Lisboa — Lisboa estava ainda dia e meio — mas era o ar que vinha de Lisboa. Cheirava a maré baixa, a lodo, e a qualquer coisa salgada que se misturava com pinheiro. Cheirava a longe.</p>
+<p data-pid="p163">Os cavalos pareceram perceber. Aligeiraram um pouco. Não muito.</p>
+<p data-pid="p164">Diogo mandou parar à entrada de aldeia pequena, antes de a noite cair. Cinco casas, um forno comunitário, dois carros de bois encostados a uma parede. O sargento foi tratar de telhados. Lázaro ficou ao pé do cavalo a despachá-lo. Quando levantou a cabeça, Gil estava outra vez a olhar para ele. Desta vez Gil teve cuidado de não ser apanhado. Voltou-se a tempo.</p>
+<p data-pid="p165">Lázaro acabou o cavalo. Levou os alforjes para a casa.</p>
+<p data-pid="p166">À fogueira, mais tarde, Diogo sentou-se no banco a contar os homens à roda dos olhos. Eram seis com Lázaro. Era a conta certa.</p>
+<p data-pid="p167">Olhou para o aguadeiro. Tinha-o visto em Coimbra. Olhou para Gil. Sargento. Para o soldado velho. Para o homem da capa cinzenta encostado à árvore mais ao fundo.</p>
+<p data-pid="p168">Aquele homem.</p>
+<p data-pid="p169">Diogo coçou a têmpora com a mão boa. Estava cansado. Os últimos cinco dias tinham-lhe deixado um peso nas costas que ele já conhecia. A memória dele andava boa para nomes e má para caras. Devia ter visto aquele homem montar à porta da cidadela. Devia ter visto.</p>
+<p data-pid="p170">A chuva confundia tudo.</p>
+<p data-pid="p171">Olhou para o homem da capa cinzenta mais um instante. O homem sentiu o olhar. Voltou a cabeça muito devagar — não com pressa, não com preguiça, mas com o tempo de quem está habituado a ser olhado. Acenou levemente a Diogo, como se fossem velhos conhecidos.</p>
+<p data-pid="p172">Diogo retribuiu o aceno. Voltou-se para a fogueira.</p>
+<p data-pid="p173">Lázaro estava do outro lado, a mastigar pão duro e a olhar para o fogo. Não tinha visto.</p>
+<p data-pid="p174">Ainda não.</p>
+<hr />
+<h1 data-pid="p175" class="chapter-num">IV</h1>
+<h2 data-pid="p176" class="chapter-title"><em>O Homem da Escolta</em></h2>
+<p data-pid="p177">Quinta noite. Lázaro não sabia o nome da aldeia. Tinha visto cinco casas e dois carros de bois encostados a uma parede. Era essa a aldeia. Os cavalos foram para um anexo, os homens para outro. O sargento velho tinha-o feito antes — tudo o seu para tudo o nosso, sem mais — e o lavrador da terceira casa não tinha protestado. Os anexos eram do sobrinho. O sobrinho tinha morrido em Setúbal o ano anterior. Os anexos eram da chuva e das cabras, agora.</p>
+<p data-pid="p178">A fogueira ficava a meio do pátio. Lenha boa, pinho seco, que estalava em fagulhas para o ar. À roda: Diogo, o sargento, Gil, o aguadeiro de costas para a estrada. O outro soldado dormia já contra a parede, debaixo de uma manta cinzenta. O quinto homem — o da capa cinzenta — estava encostado à árvore mais ao fundo, fora do círculo da luz. Não falava.</p>
+<p data-pid="p179">Lázaro estava do lado oposto à fogueira. O calor não lhe chegava bem. Tinha as botas húmidas ainda da chuva da tarde, e o pé direito doía-lhe há duas horas. Mexeu-o no banco. Doeu mais.</p>
+<p data-pid="p180">Levantou-se. Os soldados olharam-no. Nenhum perguntou.</p>
+<p data-pid="p181">— Já volto.</p>
+<p data-pid="p182">Saiu pelo lado escuro do pátio.</p>
+<hr />
+<p data-pid="p183">Atrás dos anexos havia um olival pequeno e velho, com sete ou oito árvores curtas. A lua estava em quarto. Dava para ver onde se pousavam os pés. Dava pouco para mais.</p>
+<p data-pid="p184">Foi até à terceira oliveira. Encostou a testa ao tronco enquanto fez o que tinha ido fazer. A casca raspava-lhe a pele da testa. O cheiro dali era de azeitona caída há muito, fermentada, com qualquer coisa de cogumelo por baixo.</p>
+<p data-pid="p185">Fechou os calções. Não voltou logo.</p>
+<p data-pid="p186">Ficou parado a olhar para a noite. As mãos estavam frias. Meteu-as por dentro das mangas da capa. Por entre as árvores, longe, viam-se duas ou três lanternas pequenas que talvez fossem outra aldeia, ou talvez fossem apenas duas ou três lanternas pequenas. Não interessava.</p>
+<p data-pid="p187">Foi quando ouviu o som.</p>
+<p data-pid="p188">Passo. Atrás dele. A trinta passos.</p>
+<p data-pid="p189">Lázaro não se virou. O pulso não acelerou — havia muito que tinha deixado de acelerar nestas alturas. Mas as mãos saíram das mangas, devagar.</p>
+<p data-pid="p190">Ouviu outro passo. Mais perto. Outro. Vinte passos. Quinze. Quem caminhava sabia caminhar — pé pousado por inteiro antes do peso, agulhas de pinho que não estalavam debaixo das botas. Mas a respiração ouvia-se. Quem o seguia respirava pela boca por causa do frio.</p>
+<p data-pid="p191">A dez passos, parou.</p>
+<p data-pid="p192">Houve silêncio entre os dois.</p>
+<p data-pid="p193">— <em>Salutem in Domino</em> — disse o homem, baixo.</p>
+<p data-pid="p194">Lázaro fechou os olhos um momento.</p>
+<p data-pid="p195">Aquele latim. As duas palavras juntas, sem cesura, e o <em>s</em> fechado como quem aprendeu a falar a língua em sítio onde fechar o <em>s</em> era forma de não chamar a atenção. Aquele latim aprendia-se em três sítios no mundo. Lázaro tinha estado em dois deles. O homem atrás dele também.</p>
+<p data-pid="p196">Lázaro virou-se.</p>
+<p data-pid="p197">O homem estava à beira de uma oliveira, capa cinzenta, capucho descido até meio da testa. Cara em sombra, mas via-se a barba grisalha curta, e a respiração branca em pequenas baforadas. As mãos pendiam-lhe ao lado do corpo. A direita estava fechada. Não em punho — fechada para esconder qualquer coisa.</p>
+<p data-pid="p198">— <em>Et cum spiritu tuo</em> — respondeu Lázaro. Em voz tão baixa como a do outro. Sem entoação litúrgica nenhuma.</p>
+<p data-pid="p199">O homem inclinou a cabeça meio centímetro. Era confirmação.</p>
+<p data-pid="p200">Deu um passo em frente. A luz da lua bateu-lhe nos olhos por meio segundo. Eram azul-acinzentado, muito claros.</p>
+<p data-pid="p201">Lázaro endureceu nos ombros. Não na cara — nos ombros. Foi a única coisa que o corpo dele fez. Mas chegou.</p>
+<p data-pid="p202">— Chamo-me Stefano — disse o homem. — Mercador genovês. Seda. Mastique. Coisas mais pequenas.</p>
+<p data-pid="p203">Lázaro acenou uma vez.</p>
+<p data-pid="p204">— Tens uma porta para abrir em Lisboa — disse Stefano. Sotaque ainda italiano em qualquer sítio onde falasse, mas mais cuidado do que devia ser para o que dizia ser. — Tens outra coisa para fazer enquanto lá estás.</p>
+<p data-pid="p205">Lázaro não respondeu.</p>
+<p data-pid="p206">— Há um livro escondido na cidade. Encontra-lo. Guarda-lo. Depois da queda, um homem vai procurar-te. Entregas. O homem dir-te-á uma palavra. Saberás que é ele por causa da palavra.</p>
+<p data-pid="p207">— Que palavra?</p>
+<p data-pid="p208">— Quando for tempo. Não antes.</p>
+<p data-pid="p209">Silêncio. O frio começava a entrar pelas calças de Lázaro. Cruzou as mãos à frente do corpo. Esperou.</p>
+<p data-pid="p210">— Quem o quer?</p>
+<p data-pid="p211">Stefano olhou-o. O sorriso veio-lhe meio escondido pelo capucho. Não era sorriso de troça.</p>
+<p data-pid="p212">— Não te importes.</p>
+<p data-pid="p213">— Sim que me importo.</p>
+<p data-pid="p214">— Não. Importas-te com o ouro. O resto não te interessa.</p>
+<p data-pid="p215">Lázaro não respondeu. Olhou-o.</p>
+<p data-pid="p216">Stefano esperou. Depois aceitou.</p>
+<p data-pid="p217">— Cinco vezes mais do que te paga o rei. Pago em duas partes. Metade quando entras. Metade quando entregas.</p>
+<p data-pid="p218">— Como me pagas em Lisboa cercada?</p>
+<p data-pid="p219">— Tenho lá quem pague.</p>
+<p data-pid="p220">Lázaro mastigou aquilo sem mover a cara.</p>
+<p data-pid="p221">— Quem o quer.</p>
+<p data-pid="p222">Stefano olhou-o muito tempo. Houve um momento em que pareceu prestes a responder de uma maneira e respondeu de outra. Lázaro registou a pausa. Stefano respirou fundo. A respiração saiu-lhe ligeiramente quebrada — quase uma tosse, contida no peito. Coçou a têmpora com a mão esquerda. Depois disse:</p>
+<p data-pid="p223">— Há homens em... Roma que dormem mal há quatro anos. O livro é a razão. Esses homens não me importam a mim, e não te devem importar a ti. Mas pagam.</p>
+<p data-pid="p224">A mão direita continuava fechada.</p>
+<p data-pid="p225">Lázaro olhou-a. Demorou-se a olhar. Stefano, ao fim de um segundo, virou a palma para si próprio como quem se coça. A demora antes do gesto era a confissão.</p>
+<p data-pid="p226">Antes de a virar, deixou que Lázaro visse o anel. Selo de prata escurecida. Pedra para dentro. O que estava no anel não se via porque estava encostado à palma — e era ali que devia estar.</p>
+<p data-pid="p227">Lázaro não comentou. Stefano não comentou.</p>
+<p data-pid="p228">— Aceito.</p>
+<p data-pid="p229">— Bom.</p>
+<p data-pid="p230">Stefano voltou a fechar a mão. Recuou um passo, depois outro. Por um momento pareceu apoiar-se levemente no tronco da oliveira atrás dele — pouco, e disfarçado de fazer outra coisa. Lázaro viu. Não comentou.</p>
+<p data-pid="p231">— Lázaro.</p>
+<p data-pid="p232">Era a primeira vez que Stefano dizia o nome.</p>
+<p data-pid="p233">— Em Lisboa, há sempre nevoeiro de manhã, no Tejo. Sai com o sol nos olhos.</p>
+<p data-pid="p234">Disse-o em tom de quem comenta o tempo. Como se fosse conselho prático de viajante. Lázaro acenou levemente, como se também o tivesse recebido como tal.</p>
+<p data-pid="p235">Stefano voltou-lhe as costas. Foi pelo olival fora, em direcção à fogueira do pátio. Pisava igual ao que tinha pisado antes — pé pousado por inteiro, sem som. A meio do caminho, levou a mão ao peito durante uma fracção. Apertou levemente, como quem alivia uma azia ou outra coisa. Continuou.</p>
+<hr />
+<p data-pid="p236">Lázaro ficou.</p>
+<p data-pid="p237">Ficou mais cinco minutos. A noite estava igual. As lanternas longe estavam iguais. O ar nocturno cheirava a chuva por chegar e a azeitona velha. Ele cheirava ao seu próprio suor frio.</p>
+<p data-pid="p238">Aquele homem.</p>
+<p data-pid="p239">Havia coisas que se esqueciam em vinte anos. Aqueles olhos não eram uma delas. O anel também não.</p>
+<p data-pid="p240">Encostou-se à oliveira. Pousou a palma esquerda na casca. A casca raspou-lhe os dedos. Ficou ali a sentir a casca a raspar enquanto a respiração lhe assentava.</p>
+<p data-pid="p241">Não estava bem. Stefano também não estava bem. Era o melhor que se podia dizer.</p>
+<p data-pid="p242">Lázaro saiu do olival.</p>
+<hr />
+<p data-pid="p243">Quando voltou ao pátio, a fogueira estava mais baixa. Diogo tinha-se deitado já. O sargento estava acordado, com os olhos meio fechados, a fingir que dormia. Gil dormia mesmo. O aguadeiro também.</p>
+<p data-pid="p244">Stefano estava sentado no lugar onde Lázaro estivera antes. Mastigava o resto do pão duro de Lázaro.</p>
+<p data-pid="p245">Não levantou os olhos quando Lázaro chegou. Não disse nada.</p>
+<p data-pid="p246">Estendeu-lhe o resto do pão.</p>
+<p data-pid="p247">Lázaro pegou. Sentou-se. Mastigou.</p>
+<p data-pid="p248">Não voltaram a olhar um para o outro em toda a noite.</p>
+<hr />
+<h1 data-pid="p249" class="chapter-num">V</h1>
+<h2 data-pid="p250" class="chapter-title"><em>A Frota e a Cidade</em></h2>
+<p data-pid="p251">Quando Lázaro acordou, Stefano já não estava.</p>
+<p data-pid="p252">Não tinha estado, talvez. A árvore ao fundo do pátio era a mesma árvore, com a mesma casca aberta no mesmo sítio. Faltava só o homem que ali se tinha encostado a noite toda, e a capa cinzenta, e o cavalo dele no anexo. Os outros cavalos respiravam à sua maneira como se nada lhes tivesse sido tirado.</p>
+<p data-pid="p253">Nenhum dos soldados disse nada. Diogo apertou a sela do seu cavalo sem comentar. O sargento velho mediu a manhã com o nariz, decidiu que não ia chover, e foi acordar Gil aos pontapés. O aguadeiro encheu uma pipa na cisterna da aldeia. O cão magro tinha-se ido embora também.</p>
+<p data-pid="p254">Lázaro montou. Diogo passou ao lado dele uma vez antes de tomar a frente. Olhou-o sem olhar. Não disse nada. Não havia o que dizer.</p>
+<p data-pid="p255">Era a sexta manhã. Lisboa estava antes do fim do dia.</p>
+<hr />
+<p data-pid="p256">A planície baixou-os lentamente.</p>
+<p data-pid="p257">As oliveiras davam lugar às figueiras, e as figueiras estavam pesadas naquele Setembro. Os figos caíam onde caíam. Ninguém os colhia naquele ano. Não havia mãos. As mãos que podiam colher figos estavam em Lisboa ou à volta dela, e Lisboa não estava a poder. O cheiro do figo apodrecido subia das raízes, atravessava a estrada, ficava nas narinas dos cavalos. Era um cheiro doce, espesso, demasiado adiantado para Outono. Lázaro fechou a boca contra ele e respirou pelo nariz, e ainda assim entrou.</p>
+<p data-pid="p258">Passaram uma fonte sem mulheres. Uma capela de paredes caiadas, fechada. Uma carroça de melões partidos, deixada de lado, com moscas. As aldeias estavam mais quietas do que deviam para uma manhã sem chuva. Eram já as aldeias do cerco, mesmo sem o saberem ainda.</p>
+<p data-pid="p259">A meio da tarde, o ar mudou.</p>
+<p data-pid="p260">Não foi pelos olhos. Foi pelo pulmão. O cheiro a maré subiu primeiro — lodo, salina, peixe a secar mal —, e por baixo dele um cheiro mais velho, queimado. Lenha de pinho a arder em quantidade. Cordas. Couro estragado pela humidade. Suor que estava ali há muitos dias.</p>
+<p data-pid="p261">Lázaro endireitou-se na sela. Diogo, à frente, fez o mesmo. Os homens não falaram. Quem cavalga para um cerco sabe quando o cerco começa a chegar antes da terra.</p>
+<hr />
+<p data-pid="p262">Diogo parou o cavalo num alto descampado a meio da última encosta. Os outros pararam atrás. Lázaro chegou ao lado dele.</p>
+<p data-pid="p263">A frota estava na foz.</p>
+<p data-pid="p264">Eram, ao baixar dos olhos, cento e tal navios. Demasiados para contar de longe. Ancorados em segunda e terceira fila, com as proas viradas para a corrente, fumegando como um rebanho parado em manhã de frio. Mais perto, a oeste, viam-se já os fossos do cerco, os taludes, os pinhais cortados em terreno aberto. O acampamento cristão estava em colmeia em duas encostas. Fumo de fogueiras a fios subindo direito porque o vento tinha-se calado.</p>
+<p data-pid="p265">E ao centro, em cima do morro: a cidade. Estava quieta.</p>
+<p data-pid="p266">Muralhas que vinham do mar e subiam, mesquita aljama no meio, alcáçova em cima dela. Telhados a sobreporem-se uns aos outros até onde a vista deixava de servir. O Tejo brilhava à direita, longo demais para o olho.</p>
+<p data-pid="p267">Diogo cuspiu para o lado.</p>
+<p data-pid="p268">— <em>É essa.</em></p>
+<p data-pid="p269">— <em>É.</em></p>
+<p data-pid="p270">Lázaro ficou a olhar. O olho parou na alcáçova um momento a mais do que precisava. Os reis dos mouros tinham construído aquele morro a pensar em todos os reis dos mouros que viriam a seguir. Não tinham pensado neste outono. Era um defeito comum.</p>
+<p data-pid="p271">Diogo notou. Não comentou. Esporeou o cavalo. Desceram.</p>
+<hr />
+<p data-pid="p272">O acampamento começava num grupo de vinhas trabalhadas até à raiz e depois cortadas. As cepas estavam queimadas e o chão batido por sapatos. Daí em diante era tendas. Cordas, paus de pinho, lona de várias cores que tinha sido toda da mesma cor uma vez. Fumo a sair de tudo o que estava feito para deixar sair fumo, e de algumas coisas que não estavam.</p>
+<p data-pid="p273">Os cercos faziam aquilo sempre. Construíam, ao lado daquilo que queriam tomar, uma versão mais miserável. Tendas em vez de casas. Latrinas em vez de fontes. Um deus mais barulhento. Os homens que ali viviam há quatro meses tinham deixado de notar a diferença, e talvez fosse essa a única razão por que ainda lá estavam.</p>
+<p data-pid="p274">Atravessaram. Diogo sabia o caminho. Não foi parado por sentinelas — o capacete azul-acinzentado em cima da capa molhada era credencial suficiente, e os homens que poderiam ter perguntado preferiam não.</p>
+<p data-pid="p275">Passaram por um forno improvisado em pedra recente, mal pousada. Uma cozinheira de braços vermelhos até ao cotovelo virou a cabeça quando eles passaram. Olhou-os um segundo a mais do que devia — não a Diogo, a Lázaro. Não disse nada. Voltou ao pão. Lázaro registou-a. Os olhos dela tinham idade de coisas que ela tinha visto.</p>
+<p data-pid="p276">Mais à frente, à beira de uma trave de pinho de quatro braças que sete homens não conseguiam mover, um homem pequeno e moreno mediu-a com cordas. Tinha as mãos pretas de carvão até aos punhos. Fazia contas em voz baixa, em italiano, e escrevia números num tijolo com um pedaço de carvão como se o tijolo lhe servisse de pergaminho. Quando Diogo passou ao lado, não levantou a cabeça. A trave estava a três dedos de partir, e dali a uma semana ia ser parte de uma torre.</p>
+<p data-pid="p277">Passaram uma fila de feridos a apanhar sol fora de uma tenda. Latim ruim atrás. Cheiro a urina. Um deles ria por causa de outra coisa.</p>
+<p data-pid="p278">Em algum sítio dentro da cidade, um almuédano começou a chamar à oração da tarde.</p>
+<p data-pid="p279">A voz veio. Atravessou os fossos. Passou por cima das máquinas de cerco. Caiu no acampamento. Nenhum dos cruzados virou a cabeça. Habituaram-se em quatro meses a ignorar.</p>
+<p data-pid="p280">Lázaro virou. Pouco. Meio centímetro. Diogo, dois passos à frente, não viu.</p>
+<hr />
+<p data-pid="p281">A tenda era pequena. Estava encostada a um sobreiro velho que dava sombra a meio do dia. Uma cama de pau com palha por cima. Um tonel de água da chuva ao lado, fora. Uma mesa baixa com pão fresco — fresco a sério, ainda quente debaixo do pano — e uma escudela de barro com azeitonas e queijo de cabra. Vinho de mistura, e água ao lado.</p>
+<p data-pid="p282">— <em>Banha-te. Come. Espera</em> — disse Diogo. — <em>Naquele tonel. Não há mais.</em></p>
+<p data-pid="p283">— <em>Quanto tempo?</em></p>
+<p data-pid="p284">— <em>O que demorar.</em></p>
+<p data-pid="p285">Diogo saiu. A aba caiu para trás dele.</p>
+<p data-pid="p286">Lázaro despiu-se. O ar estava bom. Mais quente do que em Coimbra havia uma semana, mais salgado. Lavou-se de pé ao lado do tonel, com um trapo, sem cerimónia. Não havia ninguém à vista, mas sabia haver olhos por todo o lado em acampamento de cerco. Lavou-se rápido. Vestiu-se. A túnica de lã crua cobriu-lhe o lado esquerdo das costelas como se ali não houvesse nada de especial para esconder.</p>
+<p data-pid="p287">Sentou-se na beira do enxergão. Partiu o pão. Mastigou. Estava bom. Era o melhor pão que tinha tido em dois meses. Não devia ter sido.</p>
+<p data-pid="p288">Bebeu água. O vinho deixou no copo, em cima da mesa, com a mão esquerda estendida ao lado mas afastada. A mão estava quieta. Por hoje, estava quieta.</p>
+<p data-pid="p289">Lá fora, o acampamento fazia o som que os acampamentos fazem. Martelos. Ordens em duas línguas. Um cavalo a relinchar à distância. Um pregador algures, em latim mau. Um cão. Sempre um cão.</p>
+<p data-pid="p290">Lázaro pousou-se contra o pano da tenda. Fechou os olhos um momento. Não dormiu. Mas deixou de pensar.</p>
+<hr />
+<p data-pid="p291">À tarde, Diogo voltou. Não bateu à tenda. Levantou a aba.</p>
+<p data-pid="p292">— <em>O rei quer ver-te.</em></p>
+<p data-pid="p293">Lázaro pousou o pão.</p>
+<hr />
+<h1 data-pid="p294" class="chapter-num">VI</h1>
+<h2 data-pid="p295" class="chapter-title"><em>Audiência</em></h2>
+<p data-pid="p296">A tenda real era maior que as outras mas não tanto.</p>
+<p data-pid="p297">Estava no centro do acampamento, em terreno mais alto, com duas sentinelas à porta que não pararam Diogo quando ele passou. Diogo só virou a cabeça para uma delas, e a sentinela bateu duas vezes no pano com o cabo da lança. De dentro veio um som — não foi palavra. Diogo levantou a aba e entrou. Lázaro entrou atrás.</p>
+<p data-pid="p298">Lona vermelha por dentro, escurecida pelo fumo dos óleos. Cheirava a couro, a sebo a arder, e a um homem que não tomava banho havia uma semana. Uma mesa baixa com pergaminhos rolados. Uma cadeira de braços vazia. Um escudeiro encostado à parede do fundo, parado como se fosse parte da lona.</p>
+<p data-pid="p299">Ao centro, num quadrado de chão limpo onde a areia tinha sido alisada com a palma da mão, estava o rei.</p>
+<p data-pid="p300">Estava em cócoras. A mão direita pousada num pedaço de carvão, a esquerda a apoiar-se no joelho do mesmo lado. Olhava para o mapa que tinha desenhado no chão — linhas grossas onde estavam as muralhas, círculos para as portas, um traço comprido para o Tejo. Trinta e oito anos. Cabelo cortado curto pela necessidade, não pela moda. Barba mal feita, dois ou três dias.</p>
+<p data-pid="p301">Não levantou os olhos.</p>
+<p data-pid="p302">Diogo parou a três passos. Não fez vénia. Disse:</p>
+<p data-pid="p303">— <em>O homem.</em></p>
+<p data-pid="p304">Afonso continuou a olhar para o mapa. Marcou uma cruz junto a uma das portas. Apagou-a com o polegar. Marcou outra mais a oeste.</p>
+<p data-pid="p305">— <em>Sabes o que é isto?</em> — perguntou. Continuava a olhar para a areia.</p>
+<p data-pid="p306">Lázaro deu meio passo à frente. Olhou.</p>
+<p data-pid="p307">— <em>Lisboa.</em></p>
+<p data-pid="p308">— <em>Sabes quantos meses está cercada?</em></p>
+<p data-pid="p309">— <em>Quatro.</em></p>
+<p data-pid="p310">— <em>Quatro e qualquer coisa.</em></p>
+<p data-pid="p311">Afonso pousou o carvão. Levantou-se. Era mais alto do que tinha parecido em cócoras. Limpou as mãos uma na outra. As palmas ficaram pretas de carvão até aos pulsos.</p>
+<p data-pid="p312">Mediu Lázaro com os olhos. Mediu rápido — não era homem de olhar muito tempo para outro homem.</p>
+<p data-pid="p313">— <em>Há quem diga que tu já não estavas vivo.</em></p>
+<p data-pid="p314">Lázaro olhou-o.</p>
+<p data-pid="p315">— <em>Estou.</em></p>
+<p data-pid="p316">— <em>Bom.</em></p>
+<p data-pid="p317">Afonso aproximou-se. Tinha de baixar-se um pouco para olhar Lázaro nos olhos. Cheirava a couro suado e a vinho da véspera. Não tinha tomado banho de manhã, ou tomara um que não valeu de nada.</p>
+<p data-pid="p318">— <em>A frota</em> — disse. — <em>Tens uma frota lá em baixo. Sabes ler frotas?</em></p>
+<p data-pid="p319">— <em>Sei ver frotas.</em></p>
+<p data-pid="p320">— <em>Aquela frota tem de cá estar até ao fim. Se for embora antes do fim, eu perco. E se eu perder, os homens dela perdem mais do que ganhariam ficando.</em> — Pausa. — <em>Mas as proas vão ficando viradas para norte. Olha-se delas e percebe-se.</em></p>
+<p data-pid="p321">Lázaro acenou uma vez. Era verdade. Tinha visto as proas da estrada.</p>
+<p data-pid="p322">— <em>Antes do São Martinho</em> — disse Afonso. — <em>Quero a cidade antes do São Martinho.</em></p>
+<p data-pid="p323">— <em>Que dia.</em></p>
+<p data-pid="p324">— <em>Onze do mês que vem. Daqui a sete semanas. Seis e meia se o Tejo não enche.</em></p>
+<p data-pid="p325">Era prazo curto. Lázaro fez a conta sem precisar de fazer.</p>
+<p data-pid="p326">— <em>Que porta.</em></p>
+<p data-pid="p327">— <em>Essa decides tu. Diogo trata da entrada. Vês a cidade por fora dois dias, três, o que precisares. Diz a Diogo. Diogo diz-me a mim. Eu mando a tropa.</em></p>
+<p data-pid="p328">— <em>Por dentro?</em></p>
+<p data-pid="p329">— <em>Tens um homem por dentro à tua espera. Não precisas de saber mais até precisares.</em></p>
+<p data-pid="p330">Afonso voltou-se um momento para o mapa de areia. Apagou a cruz que tinha marcado a oeste, com o pé descalço. Voltou-se de novo para Lázaro.</p>
+<p data-pid="p331">— <em>Não há cidade que dure quatro meses de cerco e dure cinco. Mas há cercos que duram cinco meses e perdem a cidade. Percebes?</em></p>
+<p data-pid="p332">— <em>Percebo.</em></p>
+<p data-pid="p333">— <em>Bom.</em></p>
+<p data-pid="p334">Estendeu a mão direita. Pousou-a no ombro esquerdo de Lázaro. A mão estava preta de carvão. Pesava.</p>
+<p data-pid="p335">— <em>Não me falhes.</em></p>
+<p data-pid="p336">Não foi ameaça. Foi pedido feito com voz de ameaça porque era a única voz que ele tinha para pedir.</p>
+<p data-pid="p337">Lázaro inclinou a cabeça meio centímetro.</p>
+<p data-pid="p338">— <em>Senhor.</em></p>
+<p data-pid="p339">Afonso soltou-lhe o ombro. Voltou para as cócoras. Pegou no carvão. Voltou ao mapa. A audiência acabou sem palavra de despedida — Lázaro percebeu pelo gesto. Diogo já estava a recuar para a porta.</p>
+<p data-pid="p340">À saída, Lázaro olhou ainda uma vez para o rei. Afonso estava a redesenhar a porta a oeste, a apagar a do norte. <strong>A pensar em todas as portas que viriam a seguir.</strong></p>
+<p data-pid="p341">O escudeiro, encostado à lona do fundo, não tinha mexido em todo o tempo.</p>
+<hr />
+<p data-pid="p342">Lá fora, o sol descia já. O acampamento mudava de cor — laranja por cima, azul-cinzento por baixo. As fogueiras começavam.</p>
+<p data-pid="p343">Diogo encostou-se ao mastro da tenda. Coçou a têmpora com a mão boa. Esperou.</p>
+<p data-pid="p344">— <em>É sempre assim?</em> — perguntou Lázaro.</p>
+<p data-pid="p345">— <em>É sempre assim.</em></p>
+<p data-pid="p346">— <em>Quanto vinho?</em></p>
+<p data-pid="p347">— <em>Mais do que devia. Menos do que parece.</em></p>
+<p data-pid="p348">Lázaro acenou.</p>
+<p data-pid="p349">— <em>É maior do que eu pensava.</em></p>
+<p data-pid="p350">— <em>Todos pensam isso.</em></p>
+<p data-pid="p351">Diogo olhou-o de lado.</p>
+<p data-pid="p352">— <em>Confias?</em></p>
+<p data-pid="p353">Lázaro pensou um momento.</p>
+<p data-pid="p354">— <em>Confio no prazo dele.</em></p>
+<p data-pid="p355">Diogo riu uma vez, baixo. Era a primeira coisa parecida com riso que tinha feito desde Coimbra.</p>
+<p data-pid="p356">— <em>Bom. É o que há para confiar.</em></p>
+<p data-pid="p357">Endireitou-se. Levantou-se do mastro.</p>
+<p data-pid="p358">— <em>Vou-te apresentar a um homem.</em></p>
+<hr />
+<h1 data-pid="p359" class="chapter-num">VII</h1>
+<h2 data-pid="p360" class="chapter-title"><em>Migas</em></h2>
+<p data-pid="p361">Quando entraram na tenda de Diogo, o terceiro homem já estava à mesa.</p>
+<p data-pid="p362">Era jovem. Vinte e dois, vinte e três no muito. Cabelo encaracolado, escuro, ainda molhado de qualquer banho que tinha feito num intervalo entre tarefas. Mãos grandes pousadas em cima da mesa, com nós inchados nos dedos — daquelas mãos que ainda não sabem o que é serem velhas. Vestia uma túnica limpa por cima de uma camisa que claramente não era. Cheirava a sabão de cinza e a couro novo. Estava feliz por estar ali.</p>
+<p data-pid="p363">Diogo apontou-o com o queixo.</p>
+<p data-pid="p364">— <em>Este é o Martim. Vai contigo na porta.</em></p>
+<p data-pid="p365">Lázaro acenou.</p>
+<p data-pid="p366">— <em>Bom.</em></p>
+<p data-pid="p367">Sentaram-se. A mesa era de pinho mal acabado, com uma racha a meio que tinha sido reparada com prego e que continuava a abrir-se. Em cima, uma tigela grande de migas, com um peixe pequeno deitado por cima. Sardinha do Tejo. Já tinha sido aberta. O olho dela olhava para o tecto da tenda como se estivesse à espera de alguma coisa.</p>
+<p data-pid="p368">— <em>Pão, sardinha, alho</em> — disse Diogo. — <em>O cozinheiro tinha pouco. Tinha alho. Com alho cobre-se o resto.</em></p>
+<p data-pid="p369">Encheram tigelas. Comeram.</p>
+<p data-pid="p370">Martim comeu como come quem nunca foi pobre de mais para perder a pressa. Lázaro comeu devagar. Não era cálculo nem cerimónia; era o que o corpo dele agora sabia fazer.</p>
+<p data-pid="p371">Martim falava entre garfadas. Falava como se as palavras tivessem todas o mesmo peso, o que era falso, mas que era a forma natural dele.</p>
+<p data-pid="p372">— <em>O senhor</em> — disse, virando-se para Lázaro. — <em>Vai ensinar-me?</em></p>
+<p data-pid="p373">Lázaro mastigou. Engoliu.</p>
+<p data-pid="p374">— <em>Ensinar não. Olhar, talvez.</em></p>
+<p data-pid="p375">Martim sorriu. Tinha os dentes muito brancos. Era a primeira coisa que se notava nele, depois das mãos. Brancos a sério, sem amarelo, sem falha. Em homem que tinha comido o que se come num acampamento de cerco há quatro meses, era coisa rara. Lázaro reparou e não disse nada. <strong>Havia gente que se podia explicar pela boca antes de qualquer outra parte.</strong> Martim era dessa gente.</p>
+<p data-pid="p376">— <em>Olhar serve</em> — disse o rapaz. — <em>Olhar é o que se faz primeiro. Depois faz-se.</em></p>
+<p data-pid="p377">Diogo bebeu o vinho devagar. Olhou de Lázaro para Martim. De Martim para Lázaro. Não disse nada. Era homem que decidia se confiava em homens deixando-os falar à frente um do outro.</p>
+<p data-pid="p378">— <em>Em Leiria</em> — disse Martim, sem que ninguém perguntasse. — <em>Em Leiria fiz parte. Tinha lá estado quando se recuperou. Subi pela muralha de leste com mais três. Não morreu quase ninguém naquela noite.</em></p>
+<p data-pid="p379">Disse-o um pouco como quem se queixa. Como quem teve azar.</p>
+<p data-pid="p380">Diogo continuou a beber sem comentar.</p>
+<p data-pid="p381">Lázaro pousou a colher na beira da tigela.</p>
+<p data-pid="p382">— <em>Foi bom para Leiria.</em></p>
+<p data-pid="p383">— <em>Foi.</em></p>
+<p data-pid="p384">Martim encolheu os ombros. Por uma fracção, o sorriso largo tropeçou. Foi pequeno. Lázaro viu e não viu. Diogo não viu.</p>
+<p data-pid="p385">A conversa morreu por um momento. Lá fora, alguém cantava em alemão a três tendas de distância, mal e em voz alta, e parou no meio sem terminar a frase.</p>
+<p data-pid="p386">A aba abriu-se.</p>
+<p data-pid="p387">Margriet entrou com um pano nas mãos e o cabelo apertado debaixo de uma coifa que tinha sido branca uma vez. Era ela. Cara reconhecida da manhã. Não cumprimentou. Não olhou para Diogo nem para Martim. Olhou para Lázaro um momento — o mesmo momento da manhã, igual e diferente — e voltou-se para a mesa. Recolheu a tigela vazia das sardinhas. Os dedos dela tinham marcas antigas de fogo nas pontas, brilhantes, sem pêlo. Quem trabalha em fornos comunitários durante anos perde a impressão digital antes de perder a vista.</p>
+<p data-pid="p388">Não disse nada. Saiu.</p>
+<p data-pid="p389">Martim viu-a sair. Esperou que a aba caísse.</p>
+<p data-pid="p390">Voltou-se para Diogo. Falou em tom novo, mais baixo, sem o sorriso.</p>
+<p data-pid="p391">— <em>Tens a certeza que vai chegar lá em cima?</em></p>
+<p data-pid="p392">Disse-o sem olhar para Lázaro. A perguntar a Diogo. À frente de Lázaro.</p>
+<p data-pid="p393">Diogo olhou para Lázaro. Lázaro mastigava ainda o último pedaço. Não levantou os olhos.</p>
+<p data-pid="p394">Diogo voltou-se para Martim.</p>
+<p data-pid="p395">— <em>Vai chegar.</em></p>
+<p data-pid="p396">Martim olhou para Lázaro mais um instante. Esperou alguma coisa. Não veio nada. Acenou.</p>
+<p data-pid="p397">— <em>Bom.</em></p>
+<p data-pid="p398">Comeram mais um pouco. O alho cumpria o que prometia.</p>
+<hr />
+<p data-pid="p399">O vinho era do Douro, doce, demasiado doce para o tipo de noite que aquela ia ser. Diogo tinha-o de algum sítio onde guardava as coisas boas para quando precisava.</p>
+<p data-pid="p400">Martim contou uma história sobre uma rapariga em Penafiel. Contou-a sem ofender. Contou-a como quem ainda acredita que as raparigas em Penafiel são uma coisa que se pode pensar quando se está em Lisboa cercada.</p>
+<p data-pid="p401">Lázaro ouviu. Bebeu meio copo. Diogo riu uma vez, baixo. A segunda vez que ria desde Coimbra.</p>
+<p data-pid="p402">Martim era daqueles homens que se chama irmão antes de se chamar pelo nome.</p>
+<p data-pid="p403">Lázaro percebeu isso na primeira garfada. Acabou a tigela na mesma.</p>
+<hr />
+<p data-pid="p404">Quando Martim se levantou para sair, levantou-se rápido demais e desequilibrou-se. Não tinha bebido o suficiente para se desculpar com isso. Pôs a mão na mesa para se firmar, riu de si próprio, e disse:</p>
+<p data-pid="p405">— <em>Vemo-nos amanhã antes do sol.</em></p>
+<p data-pid="p406">Bateu no umbral da aba ao sair. Não era o tecto. Era o lado. Riu de si próprio outra vez, do outro lado da lona.</p>
+<p data-pid="p407">Foi-se embora a assobiar.</p>
+<p data-pid="p408">Diogo ficou a olhar para a aba muito tempo depois.</p>
+<p data-pid="p409">Não disse nada. Não havia o que dizer.</p>
+<hr />
+<h1 data-pid="p410" class="chapter-num">VIII</h1>
+<h2 data-pid="p411" class="chapter-title"><em>Por Fora</em></h2>
+<p data-pid="p412">Saíram do acampamento três horas antes do sol.</p>
+<p data-pid="p413">Eram três. Lázaro, Diogo, e o sargento velho que tinha vindo de Coimbra na escolta — agora sem nome para Lázaro ainda, embora o tivesse ouvido pronunciado vezes que chegavam. O sargento ia à frente porque conhecia a senha das próprias sentinelas afonsinas e porque, daí em diante, ia conhecer o terreno melhor do que os outros dois. Diogo ia segundo. Lázaro fechava.</p>
+<p data-pid="p414">Martim ficou na tenda. Diogo tinha-o decidido sem comentar. Lázaro tinha visto a decisão e estado de acordo sem comentar também.</p>
+<p data-pid="p415">Frio que cortava. Aquela hora a que Setembro deixa de fingir e começa a parecer-se com o que vem. As capas eram escuras, atadas pelo lado de dentro. Não traziam armas que tilintassem. Tinham passado meia hora antes a embrulhar fivelas em tiras de lã.</p>
+<p data-pid="p416">Atravessaram o pinhal cortado, depois o terreno aberto onde as vinhas tinham sido. As agulhas de pinho secas estalavam debaixo das botas se se pousasse mal o pé. <strong>Andaram cinquenta passos. Pararam. Escutaram.</strong> Nada. Andaram mais cinquenta. <strong>Pararam. Escutaram.</strong> Um cão muito longe. Andaram mais.</p>
+<p data-pid="p417">A muralha apareceu antes do tempo. O sargento parou e levantou meio braço. Lázaro chegou a três passos dele. Diogo a dois.</p>
+<p data-pid="p418">— <em>Demasiado perto</em> — sussurrou o sargento. Sem se virar.</p>
+<p data-pid="p419">— <em>Eu sei</em> — disse Lázaro.</p>
+<p data-pid="p420">O sargento olhou para Diogo. Diogo acenou meio centímetro. O sargento mastigou qualquer coisa em silêncio. Não era saliva.</p>
+<p data-pid="p421">— <em>Trinta passos mais</em> — disse Lázaro.</p>
+<p data-pid="p422">O sargento esperou três segundos. Depois andou.</p>
+<hr />
+<p data-pid="p423">A pedra subiu à frente deles na escuridão como uma coisa que tinha sido pousada ali há séculos por uma mão que não estava agora a olhar. Calcária. Húmida da noite. Cheirava a líquen, a mofo, a urina velha de cães que ali tinham passado quando a guerra ainda era outra. Lá em cima — talvez nove metros, talvez dez — as ameias. <strong>Tochas a intervalos.</strong> Não muitas. Os mouros sabiam contar mais do que os cristãos.</p>
+<p data-pid="p424">Lázaro encostou a palma esquerda à parede.</p>
+<p data-pid="p425">Ficou assim um tempo. Os outros dois esperaram. Diogo sabia o gesto. O sargento não, mas ficou quieto.</p>
+<p data-pid="p426">A pedra estava fria. Mas o frio mudava ao longo da muralha — onde a argamassa era antiga e onde tinha sido refeita. Lázaro andou três passos ao longo, sem tirar a palma. Sentiu o frio mudar. Andou mais dois. Mudou outra vez. Aí parou.</p>
+<p data-pid="p427">Olhou para cima. Para a direita. Apontou com o queixo.</p>
+<p data-pid="p428">Diogo seguiu o queixo. Não viu nada. Esperou.</p>
+<p data-pid="p429">Lázaro apontou de novo, mais para o lado. <strong>Uma sombra na pedra. Pequena. Vertical. Pedra mais clara, mais nova. Um rectângulo que tinha sido porta e tinha deixado de ser.</strong></p>
+<p data-pid="p430">— <em>Bab al-Hawha</em> — sussurrou o sargento.</p>
+<p data-pid="p431">Lázaro virou a cabeça.</p>
+<p data-pid="p432">— <em>Em árabe?</em></p>
+<p data-pid="p433">— <em>Em árabe. Os mouros chamam-lhe assim.</em></p>
+<p data-pid="p434">— <em>Vocês?</em></p>
+<p data-pid="p435">— <em>Alfofa, agora. Antes não tinha nome. Tinha porta.</em></p>
+<p data-pid="p436">Lázaro acenou. Aproximou-se. Pôs a palma sobre o rectângulo. A pedra ali era mais fria que a pedra à volta. Argamassa nova. Não tão nova que se notasse, mas tão velha que se sentisse a diferença com a outra.</p>
+<p data-pid="p437">— <em>Quanto tempo?</em></p>
+<p data-pid="p438">— <em>Trinta anos, dizem.</em></p>
+<p data-pid="p439">Lázaro não comentou. Era o tempo certo para a argamassa esquecer-se de ser dura.</p>
+<p data-pid="p440">Recuou um passo. Olhou para cima outra vez. À direita da Alfofa, longe, brilhava uma tocha de sentinela. Contou.</p>
+<p data-pid="p441">Vinte e três. Vinte e quatro. Vinte e cinco. Vinte e seis.</p>
+<p data-pid="p442">A tocha mudou de posição. Significava que a sentinela tinha andado.</p>
+<p data-pid="p443">Lázaro contou de novo. Trinta e dois.</p>
+<p data-pid="p444">Diogo notou que estava a contar. Sabia o porquê. Ficou quieto.</p>
+<p data-pid="p445">Aos sessenta e quatro da terceira vez, a sentinela mudou outra vez de posição.</p>
+<p data-pid="p446">— <em>Cada trinta e dois</em> — disse Lázaro, em voz mais baixa que sussurro. — <em>Vai e volta. Não para.</em></p>
+<p data-pid="p447">— <em>Salvo agora</em> — disse o sargento.</p>
+<hr />
+<p data-pid="p448">Foi então.</p>
+<p data-pid="p449">A tocha não veio do lado direito. Veio de cima. <strong>Da ameia mesmo por cima deles.</strong></p>
+<p data-pid="p450">Os três homens reagiram em metade do tempo que um homem ainda novo gastaria para reagir. Encostaram-se à pedra. Lázaro caiu sobre o cotovelo esquerdo, mal — não para evitar fazer ruído, mas porque o pé escorregou na agulha de pinho seca. O cotovelo bateu na base da muralha com peso. Não fez som que valesse alarme. Mas doeu.</p>
+<p data-pid="p451">Não respirou.</p>
+<p data-pid="p452">A luz da tocha pousou na borda da ameia por cima. Ficou. Houve um som de tecido, depois um som de fivela, depois um som de pano a ser levantado.</p>
+<p data-pid="p453">A sombra de um homem inclinou-se sobre o vazio.</p>
+<p data-pid="p454">Lázaro percebeu antes de Diogo, antes do sargento. <strong>Não era patrulha. Era uma sentinela que se tinha afastado dois passos do posto para urinar pela ameia.</strong></p>
+<p data-pid="p455">A urina caiu. Caiu a um metro à esquerda dos pés do sargento, sobre a agulha de pinho seca. Fez o som que faz a urina nas agulhas de pinho secas. Levantou um cheiro mais quente que o ar.</p>
+<p data-pid="p456">O homem em cima soltou um som de alívio em árabe. Murmurou qualquer coisa que talvez fosse oração de quem urina, talvez não. Cuspiu para o lado. Endireitou-se. A sombra recolheu-se.</p>
+<p data-pid="p457">Os passos afastaram-se na pedra. Quatro. Cinco. Seis.</p>
+<p data-pid="p458">Pararam.</p>
+<p data-pid="p459"><strong>Voltaram.</strong></p>
+<p data-pid="p460">Lázaro encostou a cara mais à pedra. Sentiu terra entrar pela boca. Não cuspiu. Sentiu a terra nos dentes da frente. Esperou.</p>
+<p data-pid="p461">A sombra voltou a inclinar-se sobre o vazio.</p>
+<p data-pid="p462">A tocha desceu mais um pouco, agora. <strong>A luz dela caiu a um palmo da bota direita de Diogo.</strong></p>
+<p data-pid="p463">Diogo não mexeu a bota. Não mexeu nada.</p>
+<p data-pid="p464">A luz iluminou o solo. Iluminou uma pegada recente. Iluminou um fio de pano que tinha caído de uma das três capas, ali, ao lado, há trinta segundos sem que ninguém o tivesse notado.</p>
+<p data-pid="p465">A luz ficou.</p>
+<p data-pid="p466"><strong>Um. Dois. Três.</strong></p>
+<p data-pid="p467">Em algum sítio na cidade, mais ao fundo, um galo cantou. Cantou cedo. Estava enganado.</p>
+<p data-pid="p468">A sombra acima virou-se para o canto do galo. A luz subiu meio metro. A tocha endireitou-se. O homem cuspiu outra vez, mas para dentro. Disse uma palavra em árabe que Lázaro percebeu sem perceber. Voltou ao posto.</p>
+<p data-pid="p469">Os passos afastaram-se. <strong>Cessaram a trinta e dois.</strong></p>
+<hr />
+<p data-pid="p470">Esperaram cinco minutos. Lázaro não cuspiu a terra. Saber-se sob o lugar onde uma sentinela tinha urinado era um conhecimento que ele preferia adiar.</p>
+<p data-pid="p471">Levantou a cara só quando a tocha tinha voltado a passar duas vezes pela direita, regular.</p>
+<p data-pid="p472">— <em>Aquela</em> — disse, apontando com o queixo à Alfofa entaipada.</p>
+<p data-pid="p473">— <em>Bab al-Hawha</em> — repetiu o sargento. Não foi pergunta. Foi confirmação.</p>
+<p data-pid="p474">— <em>Por isso.</em></p>
+<p data-pid="p475">Diogo entendeu primeiro. Acenou devagar.</p>
+<p data-pid="p476">— <em>Está fechada com pedra.</em></p>
+<p data-pid="p477">— <em>Está. Mas há trinta anos.</em></p>
+<p data-pid="p478">— <em>Trinta anos é muito.</em></p>
+<p data-pid="p479">— <em>Trinta anos é o que precisa de ser.</em></p>
+<hr />
+<p data-pid="p480">Voltaram pelo mesmo caminho. O sargento à frente. Diogo. Lázaro a fechar.</p>
+<p data-pid="p481">Atravessaram o terreno aberto onde tinham sido vinhas. Subiram o pinhal cortado. Aos duzentos passos, o sargento parou e voltou-se. Não disse nada. Ofereceu uma tira de pano. Lázaro pegou. Limpou a boca. A terra saiu suja de saliva e qualquer outra coisa.</p>
+<p data-pid="p482">Diogo olhou para o cotovelo dele.</p>
+<p data-pid="p483">— <em>Bate?</em></p>
+<p data-pid="p484">— <em>Bate.</em></p>
+<p data-pid="p485">— <em>Vai inchar.</em></p>
+<p data-pid="p486">— <em>Vai.</em></p>
+<p data-pid="p487">Continuaram.</p>
+<p data-pid="p488">Quando passaram pelo acampamento dos flamengos, alguém estava acordado. Estava a afiar uma faca.</p>
+<p data-pid="p489">O som era o que era. Pedra contra metal, ritmado. Vinha de uma tenda de pano cinzento, à direita, com fogueira ainda viva por baixo do tripé.</p>
+<p data-pid="p490">Lázaro parou meio segundo. Olhou. Não distinguiu nada.</p>
+<p data-pid="p491">— <em>Vamos</em> — disse Diogo.</p>
+<p data-pid="p492">Continuaram. O som ficou-lhes atrás durante mais cem passos antes de se perder.</p>
+<hr />
+<p data-pid="p493">Quando chegaram à tenda, Martim estava acordado, sentado no banco com uma tigela de água nas mãos. Tinha estado a espera.</p>
+<p data-pid="p494">Levantou-se. Olhou para os três. Olhou para o cotovelo do Lázaro. Não perguntou.</p>
+<p data-pid="p495">— <em>Está feito?</em></p>
+<p data-pid="p496">— <em>Está</em> — disse Diogo.</p>
+<p data-pid="p497">— <em>Qual?</em></p>
+<p data-pid="p498">Diogo olhou para Lázaro. Lázaro pousou-se no banco do outro lado. O cotovelo doía-lhe a sério agora. Ia doer-lhe mais.</p>
+<p data-pid="p499">— <em>A entaipada</em> — disse.</p>
+<p data-pid="p500">Martim ficou um momento sem perceber. Depois percebeu. Depois ficou outro momento sem dizer nada.</p>
+<p data-pid="p501">— <em>Tem trinta anos a pedra</em> — acrescentou, porque era o que faltava dizer.</p>
+<p data-pid="p502">Martim acenou. Não percebia. Acreditava.</p>
+<p data-pid="p503">Diogo encheu um copo de água. Bebeu meio. Passou o resto a Lázaro. Lázaro bebeu. A água lavou a terra dos últimos cantos da boca. Cuspiu para o chão de terra, em silêncio.</p>
+<p data-pid="p504">Lá fora, longe, alguém continuava a afiar uma faca.</p>
+<hr />
+<h1 data-pid="p505" class="chapter-num">IX</h1>
+<h2 data-pid="p506" class="chapter-title"><em>A Frota</em></h2>
+<p data-pid="p507">Lázaro dormiu três horas. Quando acordou, doía-lhe o cotovelo esquerdo mais do que doía antes de dormir. Mexeu-o devagar. Continuava a responder. Era o que importava.</p>
+<p data-pid="p508">Sentou-se no enxergão. A tenda estava vazia. Diogo tinha saído sem o acordar. Em cima da mesa havia pão, queijo, um copo de água. Lázaro comeu metade, bebeu, vestiu a túnica, calçou as botas.</p>
+<p data-pid="p509">Saiu para o sol do meio-dia. Demorou um momento a fechar os olhos contra a luz. Os homens à volta da fogueira do meio comeram-no com o olhar e voltaram-se para as tigelas.</p>
+<p data-pid="p510">Encontrou Diogo a falar com o sargento velho à porta da tenda do capelão. Esperou que acabassem. Quando Diogo se voltou, Lázaro disse:</p>
+<p data-pid="p511">— <em>Quero descer ao porto.</em></p>
+<p data-pid="p512">Diogo coçou a têmpora com a mão boa.</p>
+<p data-pid="p513">— <em>Hoje?</em></p>
+<p data-pid="p514">— <em>Hoje.</em></p>
+<p data-pid="p515">— <em>Para quê?</em></p>
+<p data-pid="p516">— <em>Ver os navios.</em></p>
+<p data-pid="p517">Diogo esperou três segundos. Lázaro sabia que ele estava a decidir se valia a pena perguntar mais. Decidiu que não.</p>
+<p data-pid="p518">— <em>Vamos.</em></p>
+<hr />
+<p data-pid="p519">O caminho era longo, e atravessava o acampamento todo por dentro. Setembro ali a meio do dia tinha calor que insistia. Os homens andavam menos. Os animais, mais.</p>
+<p data-pid="p520">Passaram por um ferreiro a martelar contra uma bigorna improvisada num cepo de pinho. O som ficava por cima de tudo o resto durante seis ou sete passos, depois deixava de ficar. Passaram por um padre a abençoar duas espadas pousadas em cima de um pano vermelho. Dizia o latim de cor, mas dizia-o sem se enganar. Passaram por uma rapariga ainda nova, sentada num banco baixo, a contar moedas pequenas para dentro de uma bolsa de couro. Levantou os olhos quando eles passaram. Olhou-os com aquela neutralidade que vinha de já ter visto demasiados homens passar.</p>
+<p data-pid="p521">À frente do anexo dos confessores estava um capelão sentado na erva, com um odre nas mãos. Não rezava. Bebia. Dois dos cães do acampamento estavam atrás dele a pelejar por uma sandália meia rota. Ele não se virou.</p>
+<p data-pid="p522">Um terceiro cão estava sentado a três passos. Olhava. Esperava a sandália a ficar livre.</p>
+<p data-pid="p523">Algures dentro de Lisboa, um almuédano começou a chamada do meio-dia.</p>
+<p data-pid="p524">A voz veio. Subiu pelas muralhas. Caiu por cima do acampamento.</p>
+<p data-pid="p525">Quatro homens, à beira de uma fogueira pequena com uma chaleira em cima, deixaram de falar. Um deles — barba ruiva, mãos sujas de óleo — virou a cabeça meio centímetro na direcção da cidade. Não olhou. Só virou. A chaleira continuou a ferver. Quando a voz acabou, ele voltou a virar a cabeça e disse qualquer coisa em flamengo. Os outros riram. Continuaram a falar.</p>
+<p data-pid="p526">Diogo passou ao lado deles sem comentar. Lázaro registou. Aqueles quatro homens iam ouvir muitos almuédanos ainda antes do fim, e nenhum deles ia continuar a ouvir.</p>
+<hr />
+<p data-pid="p527">O porto não era porto.</p>
+<p data-pid="p528">Era praia. Era praia onde a frota tinha decidido encostar porque era o que havia. A foz do Tejo a esta hora estava em maré baixa, com lodo a fazer cheiro de coisa morta há semanas, e por cima do lodo, ao largo, os cento e tal navios ancorados em fila e em segunda fila, as cordas a tilintar contra os mastros como sinos de cabras à distância.</p>
+<p data-pid="p529">O cheiro era de Tejo. O cheiro de Tejo era de Tejo. Tinha sido assim antes dos romanos, e ia ser assim depois daquele cerco. Cheirava a lama salgada. A peixe morto da véspera. A alcatrão velho. A homens que viviam em navio há quatro meses sem terem hammam onde se meter.</p>
+<p data-pid="p530">Havia barcas pequenas no areal, encostadas. Marinheiros sentados com as costas contra os cascos, a comer alguma coisa. Outros a calafetar uma falha. Uma escala apoiada num casco maior, com homens a descer e a subir com cestos.</p>
+<p data-pid="p531">Diogo apontou com o queixo para um pequeno desnível à esquerda, onde se via melhor a água sem se estar no meio do trabalho. Lázaro foi.</p>
+<p data-pid="p532">Encostaram-se a um talude de areia. Lázaro pôs a mão direita à frente do sol. Examinou.</p>
+<p data-pid="p533">A frota tinha proas. As proas estavam viradas. Afonso tinha razão.</p>
+<p data-pid="p534">— <em>Os ingleses?</em> — perguntou.</p>
+<p data-pid="p535">Diogo apontou — capa cinzenta. — <em>Aqueles.</em></p>
+<p data-pid="p536">— <em>Os flamengos?</em></p>
+<p data-pid="p537">— <em>Aqueles.</em> — Vermelho-escuro.</p>
+<p data-pid="p538">— <em>Os colonenses?</em></p>
+<p data-pid="p539">— <em>Aqueles. Os de bandeirola amarela.</em></p>
+<p data-pid="p540">Lázaro acenou. Olhou mais.</p>
+<p data-pid="p541">— <em>E o resto?</em></p>
+<p data-pid="p542">— <em>Frísios, normandos, alguns que ninguém sabe. Vieram pelo caminho.</em></p>
+<p data-pid="p543">Lázaro acenou de novo. O cotovelo doeu-lhe quando levantou o braço para apontar. Baixou-o.</p>
+<p data-pid="p544">Diogo viu o gesto. Não comentou.</p>
+<hr />
+<p data-pid="p545">Foi quando Lázaro viu o homem.</p>
+<p data-pid="p546">Não no primeiro navio. No terceiro. No convés do terceiro, que era o maior dos anglo-normandos. Dois homens a falar, encostados à amurada do lado de terra.</p>
+<p data-pid="p547">Um era pequeno, magro, cara que não se lia daquela distância. Anglo, talvez.</p>
+<p data-pid="p548">O outro era loiro. Cabelo até ao ombro. Não comprido como dos anglos — apanhado por trás com uma fita de couro. Bem vestido. Capa de pano cinzento bom, da qualidade que se conhecia pela forma como caía nos ombros. Falava com as mãos. Falava devagar. Estava a contar alguma coisa que tinha levado tempo a acontecer.</p>
+<p data-pid="p549">Riu uma vez. Era um riso largo. Largo e fácil. Riso de quem ainda achava graça à vida.</p>
+<p data-pid="p550">Lázaro endureceu nos ombros. Foi só nos ombros. A cara não mexeu.</p>
+<p data-pid="p551">O loiro pôs a mão na cintura. Tirou uma faca curta. Continuou a falar enquanto a tirava. O outro não pareceu reparar — estava a ouvir, ou fingia que estava.</p>
+<p data-pid="p552">O loiro inclinou-se para baixo. Limpou a faca contra o calcanhar da bota direita. Uma vez. Continuou a falar. <strong>Limpou outra vez.</strong> O calcanhar era de couro escuro. O gesto era automático. <strong>Limpou uma terceira vez.</strong></p>
+<p data-pid="p553">Voltou a guardar a faca. Continuou a falar. O anglo riu de qualquer coisa que ele tinha dito.</p>
+<p data-pid="p554">Lázaro ficou parado.</p>
+<p data-pid="p555">O cotovelo doía-lhe mais agora. Tinha-se esquecido dele por um momento. Era o tipo de coisa que voltava quando outra coisa pior chegava primeiro.</p>
+<p data-pid="p556">Diogo notou. Notou tudo. Ficou um momento sem dizer nada. Olhou para o navio. Olhou para Lázaro. Olhou outra vez para o navio.</p>
+<p data-pid="p557">Por fim, sem virar a cabeça:</p>
+<p data-pid="p558">— <em>Conhece-lo?</em></p>
+<p data-pid="p559">Lázaro demorou meio segundo a responder. Foi meio segundo a mais do que devia ter demorado.</p>
+<p data-pid="p560">— <em>Não.</em></p>
+<p data-pid="p561">Diogo acenou uma vez. Não voltou a perguntar.</p>
+<hr />
+<p data-pid="p562">Ficaram mais cinco minutos. Lázaro olhou para outras coisas — para a barca a calafetar, para um cão que tinha chegado ao porto não se sabia como e que estava a beber água salgada por ignorância. Não voltou a virar a cabeça para o terceiro navio.</p>
+<p data-pid="p563">O loiro acabou a história. Bateu uma vez no ombro do anglo. Riu. Voltou para dentro do navio, pelo tombadilho. O anglo ficou sozinho à amurada, a olhar para o areal sem o ver. Daqui a um minuto ia voltar também.</p>
+<p data-pid="p564">Lázaro voltou-se.</p>
+<p data-pid="p565">— <em>Vamos.</em></p>
+<p data-pid="p566">Diogo voltou-se também. Subiram a encosta de areia em silêncio.</p>
+<p data-pid="p567">Quando chegaram ao topo, Diogo parou. Pôs as duas mãos nas ancas. Olhou para o acampamento que se estendia até à muralha de Lisboa, longe. Sem virar a cabeça para Lázaro, disse:</p>
+<p data-pid="p568">— <em>Há homens que se conhecem sem terem sido apresentados.</em></p>
+<p data-pid="p569">Lázaro não respondeu.</p>
+<p data-pid="p570">Diogo continuou a andar.</p>
+<hr />
+<p data-pid="p571">Quando chegaram à tenda, Martim estava lá. Tinha trazido vinho. Queria beber com eles. Diogo aceitou — meio copo. Lázaro não. Sentou-se no enxergão. Tirou as botas. Estendeu-se sem dizer mais nada.</p>
+<p data-pid="p572">Martim olhou para Diogo. Diogo abanou meio centímetro da cabeça. Martim percebeu.</p>
+<p data-pid="p573">Beberam os dois fora, à porta da tenda, em voz baixa.</p>
+<p data-pid="p574">Lázaro dormiu antes de o sol descer.</p>
+<p data-pid="p575">Não sonhou com Acre. Tinha estado anos a treinar para não sonhar com Acre.</p>
+<hr />
+<h1 data-pid="p576" class="chapter-num">X</h1>
+<h2 data-pid="p577" class="chapter-title"><em>A Espera</em></h2>
+<p data-pid="p578">Dois dias.</p>
+<p data-pid="p579">Dois dias é o tempo que se demora a aprender o ritmo de um acampamento, se nunca se viveu num. E é o tempo que se demora a esquecer-se que se aprendeu, depois.</p>
+<hr />
+<h3 data-pid="p580"><em>Primeiro dia, manhã.</em></h3>
+<p data-pid="p581">Acordou cedo, antes da maior parte. O cotovelo doía-lhe menos. Tinha sido um dia. Já não era inflamação fresca — era inflamação a habituar-se a estar ali. As inflamações faziam isso. Aprendiam a ficar.</p>
+<p data-pid="p582">Foi à fogueira do centro. Margriet estava lá, sozinha, à frente de uma chapa de ferro em cima de duas pedras. Cozia pão pequeno, do tamanho de uma mão. Cheirava bem.</p>
+<p data-pid="p583">— <em>Pão</em> — disse Lázaro.</p>
+<p data-pid="p584">Ela não respondeu. Levantou um dos pequenos pães com uma tira de couro e estendeu-lho. Lázaro pegou. Os dedos dela tocaram nos dele um momento. As marcas brilhantes na ponta dos dedos dela tocaram na pele dele e era pele contra cicatriz sem ser pele contra pele. Lázaro deixou.</p>
+<p data-pid="p585">Ela voltou para o pão.</p>
+<p data-pid="p586">— <em>Queijo?</em></p>
+<p data-pid="p587">— <em>Por trás.</em></p>
+<p data-pid="p588">Lázaro achou o queijo. Cortou. Comeu de pé, ao lado da chapa, sem falar. Margriet não voltou a olhar para ele. Quando acabou, pousou meia moeda pequena no canto da chapa onde não queimava. Margriet viu. Não comentou. Não devolveu.</p>
+<p data-pid="p589">Lázaro foi-se embora.</p>
+<hr />
+<h3 data-pid="p590"><em>Meio-dia.</em></h3>
+<p data-pid="p591">Diogo levou-o a uma tenda lateral, atrás da do capelão. Havia ferramentas penduradas em ganchos de cordel. Alavancas curtas. Ferros pontiagudos. Cordas finas trançadas com mais cuidado do que se usava para amarrar cavalos. Tudo isto tinha sido feito para esta noite há semanas, por homens que sabiam que esta noite ia chegar.</p>
+<p data-pid="p592">Lázaro andou à volta sem tocar. Olhou. Voltou ao princípio. Pegou em três coisas: uma alavanca curta de ferro, com a ponta moldada em curva pequena, uma faca de lâmina muito fina, e uma corda de cinco metros com nó pequeno a cada palmo.</p>
+<p data-pid="p593">Pousou-as em cima de um caixote.</p>
+<p data-pid="p594">Diogo olhou. Não perguntou porquê. Pegou nos três. Embrulhou-os num pano de cânhamo. Atou.</p>
+<p data-pid="p595">— <em>Está.</em></p>
+<p data-pid="p596">Lázaro acenou. Saíram.</p>
+<hr />
+<h3 data-pid="p597"><em>Tarde.</em></h3>
+<p data-pid="p598">Martim apareceu à porta da tenda. Tinha o sorriso do dia anterior, mas mais comedido. Tinha aprendido alguma coisa entre uma noite e outra. Ainda não tinha aprendido muito.</p>
+<p data-pid="p599">— <em>Posso?</em></p>
+<p data-pid="p600">— <em>Pode.</em></p>
+<p data-pid="p601">— <em>Treinar?</em></p>
+<p data-pid="p602">Lázaro olhou-o.</p>
+<p data-pid="p603">— <em>Não.</em></p>
+<p data-pid="p604">— <em>Por favor.</em></p>
+<p data-pid="p605">— <em>Não há nada para treinar nesta tarde.</em></p>
+<p data-pid="p606">— <em>Andar sem som — diga-me só isso.</em></p>
+<p data-pid="p607">Lázaro olhou para Diogo. Diogo estava a coser uma rasgadura na capa. Não levantou os olhos. Foi a forma dele de dizer <em>vai com o rapaz</em>.</p>
+<p data-pid="p608">Foram para um pinhal corte, na orla oeste do acampamento, onde não havia ninguém a esta hora.</p>
+<p data-pid="p609">Lázaro fez uma coisa simples. Andou cinco passos. Pediu-lhe que andasse cinco. As agulhas estalaram debaixo dos pés de Martim como se ele tivesse posto fogo nelas.</p>
+<p data-pid="p610">— <em>Outra vez. Mais devagar.</em></p>
+<p data-pid="p611">Estalaram menos. Ainda estalaram.</p>
+<p data-pid="p612">— <em>Outra vez. Pé inteiro antes do peso.</em></p>
+<p data-pid="p613">Martim tropeçou. Riu de si próprio.</p>
+<p data-pid="p614">— <em>Outra vez.</em></p>
+<p data-pid="p615">Fizeram-no umas vinte vezes. Martim melhorou pouco. Não melhorou o suficiente para alguma coisa importante. Mas melhorou.</p>
+<p data-pid="p616">A meio do exercício, Martim parou. Olhou para Lázaro com uma curiosidade nova.</p>
+<p data-pid="p617">— <em>O senhor aponta sempre com o queixo. Porquê?</em></p>
+<p data-pid="p618">Lázaro continuou a olhar para o caminho de agulhas.</p>
+<p data-pid="p619">— <em>Aponta-se com o queixo</em> — disse. — <em>Aponta-se com o dedo dá tempo a quem está a olhar para perceber que se está a apontar.</em></p>
+<p data-pid="p620">Martim acenou. Aceitou aquilo como se fosse a resposta a outra pergunta — talvez fosse. Lázaro não esclareceu.</p>
+<p data-pid="p621">Voltaram a treinar mais um pouco. Martim ria das próprias falhas. Lázaro não sorriu nenhuma vez. Não por dureza. Porque também não tinha vontade.</p>
+<p data-pid="p622">Voltaram ao acampamento antes do pôr-do-sol.</p>
+<hr />
+<h3 data-pid="p623"><em>Noite.</em></h3>
+<p data-pid="p624">Subiu uma árvore.</p>
+<p data-pid="p625">Era um sobreiro alto, fora do círculo das fogueiras, perto do anexo das mulas. O cotovelo doeu-lhe quando se ergueu pelo primeiro ramo, e doeu-lhe outra vez no quinto. Não doeu nos do meio. Era esse o ritmo.</p>
+<p data-pid="p626">Subiu até um galho largo onde se podia sentar. Encostou as costas ao tronco. As pernas pendentes.</p>
+<p data-pid="p627">Lisboa estava ali, no escuro. A muralha mal se via. O que se via eram as luzes pequenas, amarelas, que ficavam acesas dentro — algumas nas janelas mais altas da alcáçova, algumas na cidade baixa, espalhadas como se alguém tivesse derramado brasas no morro. Os mouros estavam a viver normalmente. Era esse o costume dos cercos. Por dentro acontecia tudo o que sempre tinha acontecido — comer, rezar, brigar, fazer filhos, morrer — só que cada uma dessas coisas com a vaga sensação de poder ser a última vez.</p>
+<p data-pid="p628">Em algum sítio dentro da muralha, longe, um cão começou a ladrar. Ladrou três vezes. Parou.</p>
+<p data-pid="p629">Lázaro ficou na árvore muito tempo. Não fez nada. Não decidiu nada. Só ficou.</p>
+<p data-pid="p630">Quando desceu, o sobreiro tinha-lhe deixado um pedaço de casca dentro da túnica, por trás. Ia lá ficar até ele despir-se para dormir.</p>
+<hr />
+<h3 data-pid="p631"><em>Segundo dia, manhã.</em></h3>
+<p data-pid="p632">Diogo encontrou-o à fogueira. Pousou-se no banco do outro lado. Estendeu as mãos ao fogo. A boa.</p>
+<p data-pid="p633">— <em>Esta noite</em> — disse, sem olhar para ele.</p>
+<p data-pid="p634">— <em>Esta noite.</em></p>
+<p data-pid="p635">Diogo acenou uma vez. Bebeu o resto do caldo que tinha trazido. Foi-se embora.</p>
+<hr />
+<h3 data-pid="p636"><em>Segundo dia, tarde.</em></h3>
+<p data-pid="p637">Lázaro estava sentado dentro da tenda, com a corda na mão, a refazer um nó. Os nós eram de um tipo só, mas tinha querido refazê-los à sua maneira. Diogo estava deitado no enxergão, a dormir uma sesta que não fingia.</p>
+<p data-pid="p638">A aba da tenda agitou-se. Não foi vento. Foi um homem a passar, devagar, do lado de fora, e a roçar a aba ao passar.</p>
+<p data-pid="p639">Lázaro levantou os olhos. Diogo continuou a dormir.</p>
+<p data-pid="p640">Pela frincha da aba, viu-se uma capa cinzenta. Apenas a aba a ondular. Não um rosto, não um corpo inteiro. Apenas a passagem.</p>
+<p data-pid="p641">A capa parou meio segundo. Quem a vestia olhou através da frincha. Os olhos não se viram. Sabia-se que estava a olhar pelo modo como a frincha não se mexia naquela meia-fracção.</p>
+<p data-pid="p642">Lázaro não mexeu. Não devolveu o olhar. Olhou para a corda.</p>
+<p data-pid="p643">A capa continuou. Os passos afastaram-se na areia. Não fizeram som que valesse nome.</p>
+<p data-pid="p644">Diogo continuou a dormir.</p>
+<hr />
+<h3 data-pid="p645"><em>Antes da partida.</em></h3>
+<p data-pid="p646">À noite, antes de saírem, Diogo entregou-lhe uma pequena bolsa de couro. Era do tamanho de uma cereja grande, fechada com um nó de fita.</p>
+<p data-pid="p647">— <em>Não a abras antes de dentro.</em></p>
+<p data-pid="p648">Lázaro pesou-a na mão. Pesava pouco. Pesava como se contivesse uma só coisa, pequena, dura.</p>
+<p data-pid="p649">— <em>De quem?</em></p>
+<p data-pid="p650">— <em>Não te interessa.</em></p>
+<p data-pid="p651">— <em>Para quem?</em></p>
+<p data-pid="p652">— <em>Saberás.</em></p>
+<p data-pid="p653">Lázaro guardou a bolsa debaixo da capa, do lado esquerdo, junto da pele.</p>
+<hr />
+<p data-pid="p654">À hora a que os outros se vestiram, ele já estava pronto.</p>
+<p data-pid="p655">Saíram antes da meia-noite. Sete homens. Diogo. Martim. O sargento velho. Dois soldados que Lázaro não conhecia ainda, escolhidos pelo sargento sem comentário. E Lázaro.</p>
+<p data-pid="p656">Stefano não ia. Lázaro não perguntou.</p>
+<hr />
+<h1 data-pid="p657" class="chapter-num">XI</h1>
+<h2 data-pid="p658" class="chapter-title"><em>A Partida</em></h2>
+<p data-pid="p659">Saíram pela vereda do lado sul.</p>
+<p data-pid="p660">Sete homens em fila. O sargento velho à frente. Atrás dele, dois soldados que Lázaro tinha visto pela primeira vez três horas antes — escolhidos pelo sargento, e era isso que importava. Depois Diogo. Depois Martim. Depois Lázaro. E mais um soldado a fechar.</p>
+<p data-pid="p661">Hora morta. Aquela hora em que o céu já não é da noite e ainda não é da madrugada. O ar tinha o frio que cortava o pulmão por baixo. Os homens respiravam pela boca para não soltar fumo branco. Tinham passado meia hora antes a embrulhar fivelas e cabos de espada em tira de lã. Ainda assim, ao décimo passo, alguma coisa tilintou.</p>
+<p data-pid="p662">O sargento parou. Olhou para trás.</p>
+<p data-pid="p663">Era a espada curta do Martim. A bainha contra a fivela do cinto. Som pequeno, agudo, regular ao passo.</p>
+<p data-pid="p664">Lázaro deu três passos. Pôs a mão no ombro de Martim. Martim parou. Lázaro ajoelhou-se diante dele, em silêncio. Pegou na bainha. Mediu com os dedos o sítio onde encostava. Soltou a fivela um furo. Apertou de novo. A bainha ficou meio centímetro mais baixa.</p>
+<p data-pid="p665">Levantou-se. Acenou com o queixo para a frente.</p>
+<p data-pid="p666">Martim ficou com a cara muito vermelha mesmo no escuro. Lázaro viu sem ver. Ninguém disse nada. Continuaram.</p>
+<p data-pid="p667">À quinta passada, Martim deu o passo certo. Não tilintou mais.</p>
+<hr />
+<p data-pid="p668">Atravessaram um olival velho. As oliveiras eram baixas, retorcidas, com troncos abertos pelo tempo. As azeitonas tinham caído no chão duas semanas antes e estavam fermentadas. O cheiro saía da terra. Lázaro tinha sentido o mesmo cheiro a meio caminho de Pombal, dias antes.</p>
+<p data-pid="p669">Um cão ladrou. Não era cão da aldeia, nem cão do acampamento. Estava entre os dois. Tinha aprendido a ladrar a coisas que não interessavam.</p>
+<p data-pid="p670">Os homens continuaram.</p>
+<hr />
+<p data-pid="p671">Pararam antes da elevação.</p>
+<p data-pid="p672">A muralha estava do outro lado, a oitocentos metros, escondida pela linha do morro. O sargento esperou um momento, escutou, fez sinal aos dois soldados. Os dois sentaram-se na terra, com as costas contra o tronco de uma figueira. O sargento sentou-se ao lado. Os três ficavam ali.</p>
+<p data-pid="p673">— <em>Aqui</em> — disse o sargento, baixo, a Diogo. — <em>Esperamos.</em></p>
+<p data-pid="p674">Diogo acenou. O soldado que fechava o grupo encostou-se à árvore do outro lado.</p>
+<p data-pid="p675">Diogo virou-se para Lázaro.</p>
+<p data-pid="p676">Esteve um momento sem dizer nada. O olhar dele tinha um peso novo.</p>
+<p data-pid="p677">Diogo estendeu a mão direita.</p>
+<p data-pid="p678">Lázaro olhou-a um segundo a mais do que devia.</p>
+<p data-pid="p679">A mão direita de Diogo dormia há anos. Era a mão que ele não usava. Era a mão que pendia ao lado dele quando andava, fechada à custa, mais lenta a abrir-se do que a outra. Diogo não a estendia. Os homens não estendiam mãos mortas.</p>
+<p data-pid="p680">Mas estendia.</p>
+<p data-pid="p681">Lázaro estendeu a sua. A esquerda.</p>
+<p data-pid="p682">Os dedos de Diogo demoraram um instante a fechar. Não fecharam por completo. Os tendões da palma não respondiam ao que ele lhes pedia. Lázaro sentiu o peso da mão, mas pouco aperto.</p>
+<p data-pid="p683">Diogo cobriu com a mão boa, por cima. A esquerda fechou-se firme sobre as duas. Apertou.</p>
+<p data-pid="p684">— <em>Não me morras.</em></p>
+<p data-pid="p685">Disse-o baixo. Sem ênfase. Como quem comenta uma coisa do tempo. Mas era pedido.</p>
+<p data-pid="p686">Lázaro acenou meio centímetro.</p>
+<p data-pid="p687">Diogo manteve o aperto um segundo a mais. Depois soltou. As duas mãos voltaram para os lados do corpo. A direita um pouco mais devagar do que a esquerda. Diogo virou-se. Foi para junto do sargento.</p>
+<p data-pid="p688">Lázaro ficou parado um momento. Olhou Martim. Martim estava a olhar para ele com uma cara que já não era a do início da noite. Tinha visto o aperto. Não sabia o que tinha visto, mas sabia que tinha visto qualquer coisa.</p>
+<p data-pid="p689">— <em>Vamos</em> — disse Lázaro.</p>
+<p data-pid="p690">Continuaram os dois sozinhos.</p>
+<hr />
+<p data-pid="p691">A descida foi devagar. Lázaro à frente, agora. Martim atrás, três passos. Quando Martim escorregou em terra solta, Lázaro ouviu sem virar a cabeça e parou. Esperou que ele se firmasse. Continuou.</p>
+<p data-pid="p692">Aos cem passos, Martim disse-lhe baixo:</p>
+<p data-pid="p693">— <em>Senhor.</em></p>
+<p data-pid="p694">Lázaro continuou a andar.</p>
+<p data-pid="p695">— <em>Senhor — porque é que ele estendeu aquela mão primeiro?</em></p>
+<p data-pid="p696">Lázaro deu mais três passos. Pensou em duas respostas. A primeira teria sido a verdade. A segunda teria sido o que Martim precisava de ouvir. Escolheu uma terceira.</p>
+<p data-pid="p697">— <em>Não sei.</em></p>
+<p data-pid="p698">Martim aceitou. Não voltou a perguntar.</p>
+<p data-pid="p699">Continuaram. Atrás deles, na elevação, Diogo e os outros quatro tinham deixado de se ver.</p>
+<hr />
+<p data-pid="p700">A muralha apareceu antes do tempo. Sempre aparecia.</p>
+<p data-pid="p701">Lázaro deu-lhe os últimos vinte passos com o cuidado de quem tinha estado ali há duas noites. O cotovelo esquerdo doía-lhe ainda — não no osso, agora; no músculo à volta, que tinha aprendido o golpe e estava a guardar a memória dele.</p>
+<p data-pid="p702">Pela frincha da capa, do lado esquerdo, junto da pele, a bolsa de couro pequena de Diogo encostava-se a ele.</p>
+<p data-pid="p703">Ainda não a tinha aberto.</p>
+<p data-pid="p704">Tocou-a, apenas, por dentro do tecido. Pesava o que tinha pesado antes. Era uma coisa só. Pequena, dura.</p>
+<p data-pid="p705">Continuou.</p>
+<p data-pid="p706">À sua frente, no escuro, a Porta de Alfofa estava onde tinha estado há trinta anos. Entaipada. Em silêncio. À espera.</p>
+<p data-pid="p707">Atrás dela, ele sabia, havia alguém.</p>
+<hr />
+<h1 data-pid="p708" class="chapter-num">XII</h1>
+<h2 data-pid="p709" class="chapter-title"><em>A Porta</em></h2>
+<p data-pid="p710">A encosta era pior do que tinha parecido do outro lado.</p>
+<p data-pid="p711">Plantas espinhosas — não havia outro nome para o que crescia ali. Já não eram silvas. Eram coisa rasteira e dura que ninguém cuidava porque ninguém passava. Rasgaram a capa de Lázaro a três sítios. Rasgaram a do Martim em mais. Subiram em diagonal, sem olhar para trás, porque atrás deles a planície estava ao luar e qualquer movimento se via.</p>
+<p data-pid="p712">Martim respirava pela boca.</p>
+<p data-pid="p713">Lázaro parou. Pôs a mão direita no peito dele. Pouca força. Foi som, não músculo. Martim percebeu de imediato. Fechou a boca. Os últimos vinte passos fê-los a respirar pelo nariz, com a cara a esforçar-se contra o frio que cortava por dentro.</p>
+<p data-pid="p714">Aos cinquenta passos da base da muralha, Lázaro parou. Pousou-se atrás de uma pedra solta do tamanho de uma cabra. Esperou. Ouviu. Tudo o que conseguia ouvir era a respiração de Martim e o sangue dele próprio nos ouvidos.</p>
+<p data-pid="p715">Continuou.</p>
+<hr />
+<p data-pid="p716">A muralha por dentro do morro tinha cheiro diferente da muralha do reconhecimento. Ali era frio de norte. Aqui era frio de pedra encostada à terra do morro — frio mais lento, mais húmido, com qualquer coisa de musgo. As frinchas no chão eram mais largas. As argamassas tinham sido refeitas em menos sítios.</p>
+<p data-pid="p717">Lázaro encostou a palma esquerda à Alfofa.</p>
+<p data-pid="p718">A Alfofa não era pedra de muralha. Era arco de porta esquecido, cheio de pedras que tinham sido empurradas para o vazio há décadas. Não tinham sido encaixadas com método. Tinham sido encaixadas com pressa, por homens que já não estavam ali para responder pelo trabalho. Lázaro andou três passos ao longo do arco. As pedras eram quentes onde tocavam outras pedras. Eram frias onde havia espaço por dentro. Eram <strong>mais frias</strong> onde havia espaço maior.</p>
+<p data-pid="p719">Voltou ao meio.</p>
+<p data-pid="p720">Tirou as ferramentas do saco. A alavanca curta. A faca fina. A corda com nós a cada palmo. Pousou-as em cima de um pano de cânhamo que estendeu no chão. Não para o conforto delas. Para que se um daqueles instrumentos caísse, não batesse na pedra.</p>
+<p data-pid="p721">Martim olhou. Não sabia o que fazer.</p>
+<p data-pid="p722">— <em>Segura a corda</em> — sussurrou Lázaro. — <em>Esta ponta.</em></p>
+<p data-pid="p723">Martim segurou.</p>
+<p data-pid="p724">— <em>Se a pedra cair, prendes.</em></p>
+<p data-pid="p725">Martim acenou.</p>
+<p data-pid="p726">Lázaro pôs a ponta da alavanca entre duas pedras, do lado direito do arco, onde tinha sentido o vazio maior. A faca fina foi para uma frincha por baixo. <strong>Carregou.</strong></p>
+<p data-pid="p727">A pedra moveu-se meio centímetro.</p>
+<p data-pid="p728">Esperou. Carregou outra vez. Outro meio centímetro.</p>
+<p data-pid="p729">A pedra começou a sair. Lázaro pôs a corda à volta dela com um nó simples. Martim apertou a sua ponta. Lázaro tirou a pedra com as duas mãos. <strong>Pesava o que duas escudelas cheias de barro pesariam — algo entre quatro e cinco quilos.</strong> Pousou-a no chão de terra macia, sem som.</p>
+<p data-pid="p730">A primeira.</p>
+<p data-pid="p731">A segunda saiu mais fácil. A terceira também. Lázaro começou a entrar num ritmo onde o corpo dele sabia o que vinha a seguir, e os antebraços tinham deixado de pensar.</p>
+<p data-pid="p732">A quarta pedra foi diferente.</p>
+<hr />
+<p data-pid="p733">Saiu com mais resistência. Lázaro teve-a a meio do braço — quase à altura do peito — quando ouviu.</p>
+<p data-pid="p734">Som de pé.</p>
+<p data-pid="p735">Do outro lado.</p>
+<p data-pid="p736">A trinta passos. Talvez vinte.</p>
+<p data-pid="p737">Lázaro ficou imóvel.</p>
+<p data-pid="p738">A pedra na mão direita. A esquerda livre. <strong>Não a podia pousar.</strong> Pousar fazia rolar contra outras pedras. Pousar fazia som. <strong>Não a podia soltar.</strong> Soltar fazia mais som.</p>
+<p data-pid="p739">Segurou.</p>
+<p data-pid="p740">Os passos aproximaram-se. Não corridos. Passada de patrulha lenta, daquela que sabe que não há razão para se apressar — uma rotina de quem tem feito o turno todas as noites desde Maio, e sabe que não vai acontecer nada nesta como não tinha acontecido nas outras.</p>
+<p data-pid="p741">Duas vozes. Em árabe. Baixas.</p>
+<p data-pid="p742">Estavam a falar de cebolas.</p>
+<p data-pid="p743">Lázaro percebeu metade — não pela língua, que tinha esquecido pedaços, mas porque um deles imitava com a boca o som que se faz a chorar quando se corta cebola, e o outro ria baixo. <strong>Eram dois homens cansados.</strong> Não iam procurar nada.</p>
+<p data-pid="p744">A tocha aproximou-se.</p>
+<p data-pid="p745">Lázaro viu-a antes de a ver. A luz amarela atravessou as frinchas das pedras que tinham ficado. <strong>Tocou-lhe no rosto.</strong> Lázaro fechou os olhos não para se proteger da luz mas para não ter olho branco a brilhar nas frinchas. <strong>Encostou-se mais à pedra.</strong> A esquerda de Martim subiu sem ordem e cobriu-lhe a própria boca. Lázaro estendeu a esquerda — a mão livre — e pôs-a por cima da do Martim sem fazer pressão. <strong>Apenas conforto.</strong></p>
+<p data-pid="p746">O bíceps direito começou a falhar.</p>
+<p data-pid="p747">Lázaro tinha sentido isto antes, em outras paredes, em outros sítios. O músculo entra em sustentado e fica a tremer por dentro sem se mover por fora. <strong>É o último aviso que o corpo dá antes de soltar.</strong></p>
+<p data-pid="p748">Contou para si próprio.</p>
+<p data-pid="p749">Um. Dois. Três.</p>
+<p data-pid="p750">A tocha estava a um metro.</p>
+<p data-pid="p751">A patrulha parou.</p>
+<p data-pid="p752">Um dos homens — não o que tinha imitado a cebola, o outro — disse qualquer coisa em árabe. Coçou alguma coisa. <strong>Coçou.</strong> O som era de unha em pano. Não em pele. <strong>Estava a coçar uma marca na farda, talvez tinta seca, talvez gordura.</strong> Era o que se fazia quando se queria parar para não fazer outra coisa.</p>
+<p data-pid="p753">Quatro. Cinco. Seis.</p>
+<p data-pid="p754">O bíceps começou a abrir os dedos contra a vontade.</p>
+<p data-pid="p755">Lázaro tinha de mover a pedra. <strong>Mas mover a pedra com a direita que se estava a abrir fazia a pedra cair.</strong></p>
+<p data-pid="p756">Tinha de a passar para a esquerda.</p>
+<p data-pid="p757">A esquerda estava sobre a boca do Martim.</p>
+<p data-pid="p758">Tirou-a, devagar, sem nenhum som, e levou-a à pedra. Não a puxou da direita. Não fez transferência rápida. <strong>Pôs a esquerda por baixo da pedra antes de a direita soltar.</strong> Os dois braços ficaram a suportar. <strong>Os dois braços suportaram três segundos.</strong> Não foram três segundos curtos. Foram três segundos cada um composto de cinco mais pequenos.</p>
+<p data-pid="p759">Aos três segundos, a direita soltou.</p>
+<p data-pid="p760">A esquerda aguentou.</p>
+<p data-pid="p761">A direita caiu ao lado do corpo dele. <strong>Morta como a de Diogo, por enquanto.</strong> O ombro doeu por dentro.</p>
+<p data-pid="p762">Lázaro não respirou.</p>
+<p data-pid="p763">Do outro lado, o homem que coçava parou de coçar. Disse qualquer coisa. O outro respondeu. A tocha mexeu.</p>
+<p data-pid="p764"><strong>Afastou-se.</strong></p>
+<p data-pid="p765">Os passos recomeçaram. A patrulha continuou pela rua que descia para sul. Lázaro contou os passos. Trinta e dois.</p>
+<p data-pid="p766">Aos trinta e três, baixou a pedra com a esquerda. Devagar. Pousou-a no chão de terra macia. Sem som.</p>
+<p data-pid="p767">O braço esquerdo doía como se o tivesse partido. <strong>Não tinha partido.</strong> Doía em sítio que ele não tinha pensado que tinha músculo até aquele momento.</p>
+<p data-pid="p768">Olhou para Martim.</p>
+<p data-pid="p769">Martim estava a chorar. Sem som. As lágrimas saíam-lhe pelos cantos dos olhos sem se desfazerem em fungar.</p>
+<p data-pid="p770">Esperou-o um momento.</p>
+<p data-pid="p771">— <em>Continuamos.</em></p>
+<p data-pid="p772">Martim acenou.</p>
+<hr />
+<p data-pid="p773">As últimas pedras saíram mais rápido. Lázaro fê-lo quase tudo com a esquerda. A direita pendia.</p>
+<p data-pid="p774">Quando o buraco era do tamanho de um homem ajoelhado, Lázaro parou.</p>
+<p data-pid="p775">— <em>Tu primeiro.</em></p>
+<p data-pid="p776">Martim olhou-o. Lázaro apontou com o queixo.</p>
+<p data-pid="p777">Martim engatinhou para dentro. Lázaro foi atrás.</p>
+<p data-pid="p778">Do outro lado da pedra, o cheiro mudou de ofício. Pó velho. Ratos que tinham vivido ali e que tinham morrido ali e que tinham deixado ratos depois deles. Urina seca de muito tempo. <strong>Aquela passagem tinha estado fechada o tempo suficiente para a memória dos homens.</strong></p>
+<p data-pid="p779">Lázaro pôs-se de pé. Devagar. Levantar a direita era impossível agora. A esquerda doía como tinha doído. Voltou-se. Começou a reorganizar as pedras pelo lado de dentro. <strong>Usou só a esquerda.</strong> Não precisava de tirar todas, só de as alinhar o suficiente para que de fora, à luz do dia, parecesse que ali nada se tinha mexido em décadas. Quem soubesse procurar, encontraria. Os outros não.</p>
+<p data-pid="p780">Quando acabou, encostou a testa à pedra fria. Ficou assim meio minuto.</p>
+<p data-pid="p781">Atrás dele, ouviu o som.</p>
+<p data-pid="p782">Martim vomitou no canto da passagem. Não muito — quase nada no estômago. Era ácido, e cheirava ao caldo da véspera. Lázaro deu-lhe tempo. Tirou a manga rasgada da capa. Voltou-se. Limpou-lhe a boca sem o olhar nos olhos.</p>
+<p data-pid="p783">Martim agarrou-lhe a manga um momento. Soltou.</p>
+<p data-pid="p784">— <em>Desculpe</em> — sussurrou.</p>
+<p data-pid="p785">— <em>Não desculpes.</em></p>
+<hr />
+<p data-pid="p786">Esperaram cinco minutos.</p>
+<p data-pid="p787">À distância, do lado de lá da medina, um cão muçulmano ladrou. Era ladrar de cão que conhecia o bairro. Outro respondeu mais perto. <strong>Não muito mais perto.</strong></p>
+<p data-pid="p788">Lázaro pôs a esquerda contra a parede da passagem. Conhecia parede que não conhecia, mas conhecia o tipo. Calcária moura, lisa por dentro, sem entaipamentos secundários. A passagem dava para um beco coberto. <strong>A passagem tinha sido feita por alguém.</strong> Não era erosão. Era passagem antiga, esquecida, possivelmente conhecida por alguém que ainda estava vivo.</p>
+<p data-pid="p789">Martim sussurrou:</p>
+<p data-pid="p790">— <em>Estamos dentro?</em></p>
+<p data-pid="p791">Lázaro não respondeu logo.</p>
+<p data-pid="p792">A direita continuava a não responder. A esquerda guardava-lhe a dor para dali a dois dias. O ombro doía em sítio que ele já tinha esquecido que doía. A boca dele cheirava a terra da Alfofa e a poeira da passagem.</p>
+<p data-pid="p793">— <em>Estamos.</em></p>
+<hr />
+
+</main>
+
+<div class="selection-popup" id="selection-popup">
+  <button class="sp-btn" data-cat="duvida"><span class="sp-dot dot-duvida"></span>Dúvida</button>
+  <button class="sp-btn" data-cat="cortar"><span class="sp-dot dot-cortar"></span>Cortar</button>
+  <button class="sp-btn" data-cat="naopercebo"><span class="sp-dot dot-naopercebo"></span>Não percebo</button>
+  <button class="sp-btn" data-cat="nota"><span class="sp-dot dot-nota"></span>Nota</button>
+</div>
+
+<div class="existing-popup" id="existing-popup">
+  <div class="existing-popup-actions" id="existing-popup-actions"></div>
+</div>
+
+<nav class="bottombar">
+  <button class="bb-btn" id="open-sheet">Anotações <span class="bb-counter">· <span class="num" id="ann-count">0</span></span></button>
+  <button class="bb-btn" id="export-btn">Exportar</button>
+</nav>
+
+<div class="sheet-overlay" id="sheet-overlay"></div>
+<aside class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2 class="sheet-title">Anotações</h2>
+    <button class="sheet-close" id="sheet-close">✕</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+</aside>
+
+<div class="note-modal" id="note-modal">
+  <div class="note-modal-content">
+    <h3>Nota livre</h3>
+    <div class="quoted" id="note-quoted"></div>
+    <textarea id="note-text" placeholder="Escreve a tua nota…"></textarea>
+    <div class="note-modal-actions">
+      <button id="note-cancel">Cancelar</button>
+      <button class="primary" id="note-save">Guardar</button>
     </div>
+  </div>
+</div>
 
-    <div id="category-filters">
-        <div class="category-chip active" data-category="historia">
-            <span class="category-icon">🏛️</span>
-            <span>História</span>
-        </div>
-        <div class="category-chip active" data-category="natureza">
-            <span class="category-icon">🌿</span>
-            <span>Natureza</span>
-        </div>
-        <div class="category-chip active" data-category="gastronomia">
-            <span class="category-icon">🍷</span>
-            <span>Gastronomia</span>
-        </div>
-        <div class="category-chip active" data-category="arquitetura">
-            <span class="category-icon">🏰</span>
-            <span>Arquitetura</span>
-        </div>
-        <div class="category-chip active" data-category="curiosidades">
-            <span class="category-icon">✨</span>
-            <span>Curiosidades</span>
-        </div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'manuscrito_acto_I_annotations';
+const CATEGORIES = {
+  duvida: { label: 'Dúvida', class: 'h-duvida', emoji: '🟡' },
+  cortar: { label: 'Cortar', class: 'h-cortar', emoji: '🔴' },
+  naopercebo: { label: 'Não percebo', class: 'h-naopercebo', emoji: '🔵' },
+  nota: { label: 'Nota', class: 'h-nota', emoji: '🟢' }
+};
+
+let annotations = [];
+let pendingSelection = null;
+let currentEditingId = null;
+
+// ─── Persistence ────────────────────────────────────────────
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    annotations = raw ? JSON.parse(raw) : [];
+  } catch (e) { annotations = []; }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
+}
+
+// ─── Highlight rendering ─────────────────────────────────────
+function applyAllHighlights() {
+  // Clean existing wrappers first
+  document.querySelectorAll('[data-pid]').forEach(p => {
+    if (p.dataset.originalHtml) {
+      p.innerHTML = p.dataset.originalHtml;
+    }
+  });
+  // Save original HTML
+  document.querySelectorAll('[data-pid]').forEach(p => {
+    if (!p.dataset.originalHtml) p.dataset.originalHtml = p.innerHTML;
+  });
+
+  // Group by parent
+  const byParent = {};
+  annotations.forEach(a => {
+    if (!byParent[a.pid]) byParent[a.pid] = [];
+    byParent[a.pid].push(a);
+  });
+  // Sort each parent's ranges by start (descending) to wrap without affecting earlier indices
+  Object.keys(byParent).forEach(pid => {
+    const parent = document.querySelector(`[data-pid="${pid}"]`);
+    if (!parent) return;
+    const ranges = [...byParent[pid]].sort((a,b) => b.start - a.start);
+    let html = parent.dataset.originalHtml || parent.innerHTML;
+    // Work with plain text positions, then rebuild
+    const text = parent.textContent;
+    // Build with offset insertion in plain text, then reconvert <em>/<strong> back via simple replace? complicated.
+    // Simpler approach: use textContent only. Strip emphasis from highlighted spans (acceptable trade-off).
+    let plain = text;
+    ranges.forEach(r => {
+      if (r.start < 0 || r.end > plain.length) return;
+      const before = plain.slice(0, r.start);
+      const sel = plain.slice(r.start, r.end);
+      const after = plain.slice(r.end);
+      const cls = CATEGORIES[r.cat].class;
+      plain = before + `<span class="${cls}" data-ann-id="${r.id}">` + escapeHtml(sel) + '</span>' + after;
+    });
+    // For unhighlighted text we still want italics. So: only override if there are ranges.
+    if (ranges.length > 0) {
+      // Reconstruction preserves original markup ONLY for non-highlighted parts is complex; simplification: lose <em> inside highlights, keep around them.
+      // Better: just set the parent HTML to the reconstructed string (loses em on highlighted, keeps text everywhere)
+      parent.innerHTML = plain;
+    }
+  });
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── Selection handling ─────────────────────────────────────
+function getSelectionInfo() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  const text = sel.toString().trim();
+  if (!text || text.length < 2) return null;
+
+  // Find containing paragraph
+  let node = range.commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  const paragraph = node.closest('[data-pid]');
+  if (!paragraph) return null;
+
+  const pid = paragraph.dataset.pid;
+  const parentText = paragraph.textContent;
+
+  // Compute offsets in textContent
+  const preRange = document.createRange();
+  preRange.selectNodeContents(paragraph);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  const start = preRange.toString().length;
+  const end = start + text.length;
+
+  // Verify
+  if (parentText.slice(start, end) !== text) {
+    // Fallback: try to find the text directly
+    const idx = parentText.indexOf(text);
+    if (idx === -1) return null;
+    return { pid, start: idx, end: idx + text.length, text };
+  }
+
+  return { pid, start, end, text };
+}
+
+function showSelectionPopup() {
+  const info = getSelectionInfo();
+  if (!info) { hidePopups(); return; }
+  pendingSelection = info;
+
+  const sel = window.getSelection();
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  const popup = document.getElementById('selection-popup');
+  popup.classList.add('visible');
+
+  // Position above selection, fall back below
+  const popRect = popup.getBoundingClientRect();
+  let top = rect.top - popRect.height - 10;
+  if (top < 60) top = rect.bottom + 10;
+  let left = rect.left + rect.width / 2 - popRect.width / 2;
+  left = Math.max(10, Math.min(window.innerWidth - popRect.width - 10, left));
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+}
+
+function hidePopups() {
+  document.getElementById('selection-popup').classList.remove('visible');
+  document.getElementById('existing-popup').classList.remove('visible');
+}
+
+// ─── Annotation actions ─────────────────────────────────────
+function addAnnotation(cat) {
+  if (!pendingSelection) return;
+  const ann = {
+    id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6),
+    cat,
+    pid: pendingSelection.pid,
+    start: pendingSelection.start,
+    end: pendingSelection.end,
+    text: pendingSelection.text,
+    note: '',
+    chapter: findChapterFor(pendingSelection.pid),
+    timestamp: new Date().toISOString()
+  };
+
+  if (cat === 'nota') {
+    openNoteModal(ann, true);
+  } else {
+    annotations.push(ann);
+    save();
+    applyAllHighlights();
+    updateCounter();
+    showToast(CATEGORIES[cat].label + ' guardada');
+  }
+  hidePopups();
+  window.getSelection().removeAllRanges();
+  pendingSelection = null;
+}
+
+function findChapterFor(pid) {
+  // Walk back through DOM to find nearest chapter-num
+  const el = document.querySelector(`[data-pid="${pid}"]`);
+  if (!el) return '?';
+  let cur = el;
+  while (cur) {
+    if (cur.classList && cur.classList.contains('chapter-num')) {
+      return cur.textContent.trim();
+    }
+    cur = cur.previousElementSibling || (cur.parentElement && cur.parentElement.previousElementSibling);
+  }
+  // Fallback: scan upward through siblings
+  let walker = el;
+  while (walker = walker.previousElementSibling) {
+    if (walker.classList && walker.classList.contains('chapter-num')) return walker.textContent.trim();
+  }
+  return '?';
+}
+
+function deleteAnnotation(id) {
+  annotations = annotations.filter(a => a.id !== id);
+  save();
+  applyAllHighlights();
+  updateCounter();
+  renderSheet();
+  showToast('Anotação removida');
+}
+
+function updateAnnotationNote(id, note) {
+  const a = annotations.find(x => x.id === id);
+  if (!a) return;
+  a.note = note;
+  save();
+  renderSheet();
+}
+
+function changeCategory(id, newCat) {
+  const a = annotations.find(x => x.id === id);
+  if (!a) return;
+  a.cat = newCat;
+  save();
+  applyAllHighlights();
+  renderSheet();
+  showToast('Categoria alterada');
+}
+
+// ─── Existing highlight click ────────────────────────────────
+function handleHighlightClick(target) {
+  const id = target.dataset.annId;
+  const ann = annotations.find(a => a.id === id);
+  if (!ann) return;
+
+  const popup = document.getElementById('existing-popup');
+  const actions = document.getElementById('existing-popup-actions');
+  actions.innerHTML = '';
+
+  const noteBtn = document.createElement('button');
+  noteBtn.textContent = ann.note ? '✎ Editar nota' : '+ Nota';
+  noteBtn.onclick = (e) => { e.stopPropagation(); openNoteModal(ann, false); hidePopups(); };
+  actions.appendChild(noteBtn);
+
+  Object.keys(CATEGORIES).forEach(c => {
+    if (c === ann.cat) return;
+    const btn = document.createElement('button');
+    btn.innerHTML = CATEGORIES[c].emoji + ' ' + CATEGORIES[c].label;
+    btn.onclick = (e) => { e.stopPropagation(); changeCategory(id, c); hidePopups(); };
+    actions.appendChild(btn);
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.textContent = '✕ Apagar';
+  delBtn.className = 'delete';
+  delBtn.onclick = (e) => { e.stopPropagation(); deleteAnnotation(id); hidePopups(); };
+  actions.appendChild(delBtn);
+
+  popup.classList.add('visible');
+  const rect = target.getBoundingClientRect();
+  const popRect = popup.getBoundingClientRect();
+  let top = rect.bottom + 8;
+  if (top + popRect.height > window.innerHeight - 80) top = rect.top - popRect.height - 8;
+  let left = rect.left;
+  left = Math.max(10, Math.min(window.innerWidth - popRect.width - 10, left));
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+}
+
+// ─── Note modal ──────────────────────────────────────────────
+let pendingNoteAnnotation = null;
+let pendingNoteIsNew = false;
+
+function openNoteModal(ann, isNew) {
+  pendingNoteAnnotation = ann;
+  pendingNoteIsNew = isNew;
+  document.getElementById('note-quoted').textContent = '"' + ann.text + '"';
+  document.getElementById('note-text').value = ann.note || '';
+  document.getElementById('note-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('note-text').focus(), 100);
+}
+
+function closeNoteModal() {
+  document.getElementById('note-modal').classList.remove('visible');
+  pendingNoteAnnotation = null;
+}
+
+// ─── Sheet ───────────────────────────────────────────────────
+function renderSheet() {
+  const body = document.getElementById('sheet-body');
+  if (annotations.length === 0) {
+    body.innerHTML = '<div class="empty-annotations">Ainda não há anotações.<br>Selecciona texto para começar.</div>';
+    return;
+  }
+  // Sort by document order (pid number then start)
+  const sorted = [...annotations].sort((a,b) => {
+    const ap = parseInt(a.pid.slice(1));
+    const bp = parseInt(b.pid.slice(1));
+    if (ap !== bp) return ap - bp;
+    return a.start - b.start;
+  });
+  body.innerHTML = sorted.map(a => `
+    <div class="annotation-item" data-jump="${a.pid}" data-id="${a.id}">
+      <div class="annotation-cat"><span class="sp-dot dot-${a.cat}"></span>${CATEGORIES[a.cat].label} · Cap. ${a.chapter}</div>
+      <div class="annotation-text">"${escapeHtmlText(a.text)}"</div>
+      ${a.note ? `<div class="annotation-note">${escapeHtmlText(a.note)}</div>` : ''}
     </div>
+  `).join('');
+  body.querySelectorAll('.annotation-item').forEach(el => {
+    el.onclick = () => {
+      const pid = el.dataset.jump;
+      const target = document.querySelector(`[data-pid="${pid}"]`);
+      if (target) {
+        closeSheet();
+        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+      }
+    };
+  });
+}
 
-    <div id="autocomplete"></div>
+function escapeHtmlText(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
 
-    <button id="layers-btn">🗺️ Normal</button>
-    
-    <button id="view-toggle">🗺️</button>
-    
-    <div id="zoom-controls">
-        <button class="zoom-btn" id="zoom-in">+</button>
-        <button class="zoom-btn" id="zoom-out">−</button>
-    </div>
-    
-    <button id="locate-btn">📍</button>
+function openSheet() {
+  renderSheet();
+  document.getElementById('sheet-overlay').classList.add('visible');
+  document.getElementById('sheet').classList.add('visible');
+}
+function closeSheet() {
+  document.getElementById('sheet-overlay').classList.remove('visible');
+  document.getElementById('sheet').classList.remove('visible');
+}
 
-    <div id="map"></div>
+// ─── Export ──────────────────────────────────────────────────
+function exportAnnotations() {
+  if (annotations.length === 0) {
+    showToast('Sem anotações para exportar');
+    return;
+  }
+  const sorted = [...annotations].sort((a,b) => {
+    const ap = parseInt(a.pid.slice(1));
+    const bp = parseInt(b.pid.slice(1));
+    if (ap !== bp) return ap - bp;
+    return a.start - b.start;
+  });
+  const date = new Date().toISOString().slice(0, 10);
+  let txt = `ANOTAÇÕES — Manuscrito Acto I\nData: ${date}\nTotal: ${sorted.length}\n\n${'═'.repeat(60)}\n\n`;
 
-    <div id="bottom-sheet">
-        <div id="sheet-handle"></div>
-        <div id="sheet-content">
-            <div id="now-playing">A reproduzir</div>
-            <div id="location-name">---</div>
-            <div id="progress-bar">
-                <div id="progress-fill"></div>
-            </div>
-            <div id="time-display">
-                <span id="current-time">0:00</span>
-                <span id="total-time">0:00</span>
-            </div>
-            <div id="controls">
-                <button class="control-btn primary" id="pause-btn">Pausar</button>
-            </div>
-        </div>
-    </div>
+  // Group by chapter
+  const byChapter = {};
+  sorted.forEach(a => {
+    const c = a.chapter || '?';
+    if (!byChapter[c]) byChapter[c] = [];
+    byChapter[c].push(a);
+  });
 
-    <div id="nav-panel">
-        <div id="nav-info">
-            <div class="nav-stat">
-                <div class="nav-stat-label">Distância</div>
-                <div class="nav-stat-value" id="distance-left">--</div>
-            </div>
-            <div class="nav-stat">
-                <div class="nav-stat-label">Tempo</div>
-                <div class="nav-stat-value" id="time-left">--</div>
-            </div>
-        </div>
-        <button id="start-nav-btn">Iniciar</button>
-        <button id="stop-nav-btn" style="display:none;">Parar</button>
-    </div>
+  Object.keys(byChapter).forEach(chapter => {
+    txt += `── CAPÍTULO ${chapter} ──\n\n`;
+    byChapter[chapter].forEach((a, i) => {
+      txt += `[${CATEGORIES[a.cat].label.toUpperCase()}]\n`;
+      txt += `"${a.text}"\n`;
+      if (a.note) txt += `\nNota: ${a.note}\n`;
+      txt += `\n${'─'.repeat(40)}\n\n`;
+    });
+    txt += `\n`;
+  });
 
-    <div id="audio-prompt">
-        <div id="prompt-title">Chegaste a</div>
-        <div id="prompt-location">---</div>
-        <div id="prompt-buttons">
-            <button class="prompt-btn" id="prompt-yes">Sim</button>
-            <button class="prompt-btn" id="prompt-no">Agora não</button>
-        </div>
-    </div>
 
-    <audio id="audio-player"></audio>
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.js"></script>
-    <script>
-        // Configuração Mapbox
-        mapboxgl.accessToken = 'pk.eyJ1IjoicnVpYmFyYmEiLCJhIjoiY21tZG1hZXZkMDRldzJvczd5YWY0Z3I3aSJ9.bubaailQccZP22PXRNrYIg';
-        
-        // Modo dia/noite/historico/atlas
-        let mapMode = 'normal'; // normal, night, historic, atlas
-        const layersBtn = document.getElementById('layers-btn');
-        const locateBtn = document.getElementById('locate-btn');
-        const zoomInBtn = document.getElementById('zoom-in');
-        const zoomOutBtn = document.getElementById('zoom-out');
-        const viewToggle = document.getElementById('view-toggle');
-        let is3DView = true;
-        
-        // Search UI
-        const searchBox = document.getElementById('search-box');
-        const destinationName = document.getElementById('destination-name');
-        const destinationInput = document.getElementById('destination-input');
-        const autocompleteEl = document.getElementById('autocomplete');
-        
-        let currentDestination = {
-            name: 'Peniche',
-            coords: [-9.3813, 39.3558]
-        };
-        
-        // Navegação
-        let isNavigating = false;
-        let currentRoute = null;
-        let userLocation = null;
-        let userBearing = 0;
-        let watchId = null;
-        
-        // Sistema de categorias
-        const categoryFilters = {
-            historia: true,
-            natureza: true,
-            gastronomia: true,
-            arquitetura: true,
-            curiosidades: true
-        };
-        
-        // Carregar preferências guardadas
-        const savedFilters = localStorage.getItem('categoryFilters');
-        if (savedFilters) {
-            Object.assign(categoryFilters, JSON.parse(savedFilters));
-        }
-        
-        // Pontos históricos: Lisboa -> Peniche
-        const historicalPoints = [
-            {
-                id: 1,
-                name: "Torre de Belém",
-                lat: 38.6916,
-                lng: -9.2160,
-                radius: 200,
-                audio: "audio1.mp3",
-                categories: ["historia", "arquitetura"],
-                played: false,
-                prompted: false
-            },
-            {
-                id: 2,
-                name: "Mosteiro dos Jerónimos",
-                lat: 38.6979,
-                lng: -9.2061,
-                radius: 200,
-                audio: "audio2.mp3",
-                categories: ["historia", "arquitetura"],
-                played: false,
-                prompted: false
-            },
-            {
-                id: 3,
-                name: "Praia de Carcavelos",
-                lat: 38.6784,
-                lng: -9.3331,
-                radius: 500,
-                audio: "audio_carcavelos.mp3",
-                categories: ["natureza", "curiosidades"],
-                played: false,
-                prompted: false
-            },
-            {
-                id: 4,
-                name: "Palácio de Mafra",
-                lat: 38.9370,
-                lng: -9.3261,
-                radius: 300,
-                audio: "audio3.mp3",
-                categories: ["historia", "arquitetura"],
-                played: false,
-                prompted: false
-            },
-            {
-                id: 5,
-                name: "Óbidos",
-                lat: 39.3606,
-                lng: -9.1575,
-                radius: 400,
-                audio: "audio4.mp3",
-                categories: ["historia", "gastronomia"],
-                played: false,
-                prompted: false
-            },
-            {
-                id: 6,
-                name: "Peniche - Fortaleza",
-                lat: 39.3558,
-                lng: -9.3813,
-                radius: 300,
-                audio: "audio5.mp3",
-                categories: ["historia", "natureza"],
-                played: false,
-                prompted: false
-            }
-        ];
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `anotacoes_acto_I_${date}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Exportado');
+}
 
-        // Inicializar mapa
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v12',
-            center: [-9.15, 39.0],
-            zoom: 9,
-            pitch: 0
-        });
+// ─── Counter & progress ─────────────────────────────────────
+function updateCounter() {
+  document.getElementById('ann-count').textContent = annotations.length;
+}
 
-        // Aplicar filtros guardados aos chips
-        document.querySelectorAll('.category-chip').forEach(chip => {
-            const category = chip.dataset.category;
-            if (!categoryFilters[category]) {
-                chip.classList.remove('active');
-            }
-        });
+function updateProgress() {
+  const sh = document.documentElement.scrollHeight - window.innerHeight;
+  const sc = window.scrollY;
+  const pct = sh > 0 ? Math.min(100, (sc / sh) * 100) : 0;
+  document.getElementById('progress').style.width = pct + '%';
+  updateCurrentChapter();
+}
 
-        // Toggle categorias
-        document.querySelectorAll('.category-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                const category = chip.dataset.category;
-                
-                // Toggle estado
-                categoryFilters[category] = !categoryFilters[category];
-                chip.classList.toggle('active');
-                
-                // Guardar preferências
-                localStorage.setItem('categoryFilters', JSON.stringify(categoryFilters));
-                
-                // Atualizar markers no mapa
-                updateMapMarkers();
-            });
-        });
+function updateCurrentChapter() {
+  const chapters = document.querySelectorAll('.chapter-num');
+  let current = '—';
+  for (const c of chapters) {
+    if (c.getBoundingClientRect().top < 120) {
+      current = c.textContent.trim();
+    } else break;
+  }
+  document.getElementById('current-chapter').textContent = current !== '—' ? 'Cap. ' + current : '—';
+}
 
-        // Elementos UI
-        const bottomSheet = document.getElementById('bottom-sheet');
-        const locationName = document.getElementById('location-name');
-        const progressFill = document.getElementById('progress-fill');
-        const currentTimeEl = document.getElementById('current-time');
-        const totalTimeEl = document.getElementById('total-time');
-        const pauseBtn = document.getElementById('pause-btn');
-        const audioPlayer = document.getElementById('audio-player');
+// ─── Toast ───────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 1800);
+}
 
-        // Navegação UI
-        const navPanel = document.getElementById('nav-panel');
-        const startNavBtn = document.getElementById('start-nav-btn');
-        const stopNavBtn = document.getElementById('stop-nav-btn');
-        const distanceLeftEl = document.getElementById('distance-left');
-        const timeLeftEl = document.getElementById('time-left');
+// ─── Event wiring ────────────────────────────────────────────
+function init() {
+  load();
+  applyAllHighlights();
+  updateCounter();
+  updateProgress();
 
-        // Popup confirmação áudio
-        const audioPrompt = document.getElementById('audio-prompt');
-        const promptLocation = document.getElementById('prompt-location');
-        const promptYes = document.getElementById('prompt-yes');
-        const promptNo = document.getElementById('prompt-no');
-        let currentPromptPoint = null;
-        let promptTimeout = null;
+  // Selection events
+  let selTimer = null;
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(() => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim().length > 1) {
+        showSelectionPopup();
+      }
+    }, 200);
+  });
 
-        let userMarker = null;
-        let currentAudio = null;
+  // Selection popup buttons
+  document.querySelectorAll('.sp-btn').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      addAnnotation(b.dataset.cat);
+    });
+  });
 
-        // Inicializar localização ao carregar
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                position => {
-                    const { latitude, longitude } = position.coords;
-                    userLocation = [longitude, latitude];
-                    
-                    // Criar marker inicial
-                    updateUserMarker(longitude, latitude, 0);
-                    
-                    // Centrar mapa na localização
-                    map.setCenter([longitude, latitude]);
-                },
-                error => {
-                    console.error('Geolocalização:', error);
-                    // Desenhar rota padrão se falhar
-                    drawRoute([-9.3813, 39.3558]);
-                }
-            );
-        }
+  // Highlight clicks (event delegation)
+  document.getElementById('content').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-ann-id]');
+    if (t) {
+      e.stopPropagation();
+      handleHighlightClick(t);
+    } else {
+      hidePopups();
+    }
+  });
 
-        // Botão pause
-        function checkProximity(userLat, userLng) {
-            historicalPoints.forEach(point => {
-                if (!point.prompted && shouldShowPoint(point)) {
-                    const distance = getDistance(userLat, userLng, point.lat, point.lng);
-                    if (distance <= point.radius) {
-                        showAudioPrompt(point);
-                        point.prompted = true;
-                    }
-                }
-            });
-        }
+  // Click outside popups closes them
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.selection-popup') && !e.target.closest('.existing-popup') && !e.target.closest('[data-ann-id]')) {
+      hidePopups();
+    }
+  });
 
-        function showAudioPrompt(point) {
-            currentPromptPoint = point;
-            promptLocation.textContent = point.name;
-            audioPrompt.classList.add('show');
-            
-            // Auto-dismiss após 10 segundos
-            clearTimeout(promptTimeout);
-            promptTimeout = setTimeout(() => {
-                hideAudioPrompt();
-            }, 10000);
-        }
+  // Bottom bar
+  document.getElementById('open-sheet').addEventListener('click', openSheet);
+  document.getElementById('export-btn').addEventListener('click', exportAnnotations);
+  document.getElementById('sheet-close').addEventListener('click', closeSheet);
+  document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
 
-        function hideAudioPrompt() {
-            audioPrompt.classList.remove('show');
-            clearTimeout(promptTimeout);
-            currentPromptPoint = null;
-        }
+  // Note modal
+  document.getElementById('note-cancel').addEventListener('click', closeNoteModal);
+  document.getElementById('note-save').addEventListener('click', () => {
+    const text = document.getElementById('note-text').value.trim();
+    if (pendingNoteIsNew) {
+      pendingNoteAnnotation.note = text;
+      annotations.push(pendingNoteAnnotation);
+      save();
+      applyAllHighlights();
+      updateCounter();
+      showToast('Nota guardada');
+    } else {
+      updateAnnotationNote(pendingNoteAnnotation.id, text);
+      applyAllHighlights();
+      showToast('Nota actualizada');
+    }
+    closeNoteModal();
+  });
 
-        // Botões popup
-        promptYes.addEventListener('click', () => {
-            if (currentPromptPoint) {
-                hideAudioPrompt();
-                playAudio(currentPromptPoint);
-                currentPromptPoint.played = true;
-            }
-        });
+  // Progress
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  window.addEventListener('resize', updateProgress);
+}
 
-        promptNo.addEventListener('click', () => {
-            hideAudioPrompt();
-        });
-
-        // Calcular distância (Haversine)
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // raio da Terra em metros
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                    Math.cos(φ1) * Math.cos(φ2) *
-                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-            return R * c;
-        }
-
-        // Reproduzir áudio
-        function playAudio(point) {
-            currentAudio = point;
-            locationName.textContent = point.name;
-            
-            // Mensagem personalizada por ponto
-            let message;
-            if (point.name === "Praia de Carcavelos") {
-                message = "Estás perto da Praia de Carcavelos, uma das praias mais famosas da região de Lisboa, conhecida pelo surf e pela sua extensa faixa de areia dourada.";
-            } else {
-                message = `Estás perto de ${point.name}. Aqui aconteceu um importante evento histórico.`;
-            }
-            
-            const utterance = new SpeechSynthesisUtterance(message);
-            utterance.lang = 'pt-PT';
-            utterance.rate = 0.9;
-            
-            speechSynthesis.speak(utterance);
-            
-            bottomSheet.classList.add('active');
-            
-            // Simular progresso
-            let progress = 0;
-            const duration = message.length / 15; // segundos baseado no tamanho
-            const interval = setInterval(() => {
-                progress += 1;
-                progressFill.style.width = progress + '%';
-                currentTimeEl.textContent = formatTime(progress / 100 * duration);
-                totalTimeEl.textContent = formatTime(duration);
-                
-                if (progress >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        bottomSheet.classList.remove('active');
-                    }, 1000);
-                }
-            }, duration * 10);
-        }
-
-        // Botão pause
-        pauseBtn.addEventListener('click', () => {
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel();
-                pauseBtn.textContent = 'Retomar';
-            } else {
-                pauseBtn.textContent = 'Pausar';
-            }
-        });
-
-        // Toggle modo mapa (4 modos)
-        layersBtn.addEventListener('click', () => {
-            // Ciclar: normal → night → historic → atlas → normal
-            if (mapMode === 'normal') {
-                mapMode = 'night';
-                layersBtn.textContent = '🌙 Noite';
-                document.body.classList.remove('historic', 'atlas');
-                document.body.classList.add('night');
-                map.setStyle('mapbox://styles/mapbox/dark-v11');
-            } else if (mapMode === 'night') {
-                mapMode = 'historic';
-                layersBtn.textContent = '📜 Histórico';
-                document.body.classList.remove('night', 'atlas');
-                document.body.classList.add('historic');
-                map.setStyle('mapbox://styles/mapbox/streets-v12');
-            } else if (mapMode === 'historic') {
-                mapMode = 'atlas';
-                layersBtn.textContent = '🏺 Atlas';
-                document.body.classList.remove('night', 'historic');
-                document.body.classList.add('atlas');
-                map.setStyle('mapbox://styles/mapbox/light-v11');
-            } else {
-                mapMode = 'normal';
-                layersBtn.textContent = '🗺️ Normal';
-                document.body.classList.remove('night', 'historic', 'atlas');
-                map.setStyle('mapbox://styles/mapbox/streets-v12');
-            }
-        });
-
-        // Botão localização
-        locateBtn.addEventListener('click', () => {
-            if (userMarker) {
-                const lngLat = userMarker.getLngLat();
-                map.flyTo({
-                    center: [lngLat.lng, lngLat.lat],
-                    zoom: 14
-                });
-            }
-        });
-
-        // Controlos zoom
-        zoomInBtn.addEventListener('click', () => {
-            map.zoomIn();
-        });
-
-        zoomOutBtn.addEventListener('click', () => {
-            map.zoomOut();
-        });
-
-        // Toggle vista 2D/3D
-        viewToggle.addEventListener('click', () => {
-            is3DView = !is3DView;
-            viewToggle.textContent = is3DView ? '🗺️' : '🏔️';
-            
-            if (isNavigating) {
-                map.easeTo({
-                    pitch: is3DView ? 60 : 0,
-                    duration: 500
-                });
-            }
-        });
-
-        // Search box interaction
-        searchBox.addEventListener('click', () => {
-            destinationName.style.display = 'none';
-            destinationInput.style.display = 'block';
-            destinationInput.focus();
-        });
-
-        // Geocoding autocomplete
-        let searchTimeout;
-        destinationInput.addEventListener('input', (e) => {
-            const query = e.target.value.trim();
-            
-            if (query.length < 2) {
-                autocompleteEl.style.display = 'none';
-                return;
-            }
-
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                searchPlaces(query);
-            }, 300);
-        });
-
-        async function searchPlaces(query) {
-            try {
-                const response = await fetch(
-                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
-                    `access_token=${mapboxgl.accessToken}&` +
-                    `country=PT&` +
-                    `language=pt&` +
-                    `limit=5`
-                );
-                
-                const data = await response.json();
-                
-                if (data.features && data.features.length > 0) {
-                    displayAutocomplete(data.features);
-                } else {
-                    autocompleteEl.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Erro geocoding:', error);
-            }
-        }
-
-        function displayAutocomplete(places) {
-            autocompleteEl.innerHTML = '';
-            
-            places.forEach(place => {
-                const item = document.createElement('div');
-                item.className = 'autocomplete-item';
-                
-                const name = document.createElement('div');
-                name.className = 'place-name';
-                name.textContent = place.text;
-                
-                const address = document.createElement('div');
-                address.className = 'place-address';
-                address.textContent = place.place_name;
-                
-                item.appendChild(name);
-                item.appendChild(address);
-                
-                item.addEventListener('click', () => {
-                    selectDestination(place);
-                });
-                
-                autocompleteEl.appendChild(item);
-            });
-            
-            autocompleteEl.style.display = 'block';
-        }
-
-        function selectDestination(place) {
-            currentDestination = {
-                name: place.text,
-                coords: place.center
-            };
-            
-            destinationName.textContent = place.text;
-            destinationName.style.display = 'block';
-            destinationInput.style.display = 'none';
-            destinationInput.value = '';
-            autocompleteEl.style.display = 'none';
-            
-            // Centrar mapa no destino
-            map.flyTo({
-                center: place.center,
-                zoom: 8,
-                duration: 1500
-            });
-            
-            // Desenhar rota e gerar pontos
-            drawRoute(place.center);
-        }
-
-        async function drawRoute(destCoords) {
-            // Usar localização atual se disponível, senão Lisboa
-            const origin = userLocation || [-9.1393, 38.7223];
-            
-            try {
-                const response = await fetch(
-                    `https://api.mapbox.com/directions/v5/mapbox/driving/${origin[0]},${origin[1]};${destCoords[0]},${destCoords[1]}?` +
-                    `geometries=geojson&` +
-                    `overview=full&` +
-                    `steps=true&` +
-                    `continue_straight=false&` +
-                    `access_token=${mapboxgl.accessToken}`
-                );
-                
-                const data = await response.json();
-                
-                if (data.routes && data.routes[0]) {
-                    const route = data.routes[0];
-                    currentRoute = route;
-                    
-                    // Remover rota anterior se existir
-                    if (map.getSource('route')) {
-                        map.removeLayer('route');
-                        map.removeSource('route');
-                    }
-                    
-                    // Adicionar rota ao mapa com geometria completa
-                    map.addSource('route', {
-                        type: 'geojson',
-                        data: {
-                            type: 'Feature',
-                            properties: {},
-                            geometry: route.geometry
-                        }
-                    });
-                    
-                    map.addLayer({
-                        id: 'route',
-                        type: 'line',
-                        source: 'route',
-                        layout: {
-                            'line-join': 'round',
-                            'line-cap': 'round'
-                        },
-                        paint: {
-                            'line-color': '#4285f4',
-                            'line-width': 6,
-                            'line-opacity': 0.9
-                        }
-                    });
-                    
-                    // Gerar pontos ao longo da rota
-                    generateRoutePoints(route.geometry.coordinates);
-                    
-                    // Ajustar vista para mostrar rota completa
-                    const coordinates = route.geometry.coordinates;
-                    const bounds = coordinates.reduce((bounds, coord) => {
-                        return bounds.extend(coord);
-                    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-                    
-                    map.fitBounds(bounds, {
-                        padding: 80,
-                        duration: 1500
-                    });
-                    
-                    // Mostrar painel navegação
-                    navPanel.classList.add('active');
-                    updateNavStats();
-                }
-            } catch (error) {
-                console.error('Erro ao desenhar rota:', error);
-            }
-        }
-
-        function generateRoutePoints(routeCoordinates) {
-            // Limpar pontos antigos
-            historicalPoints.length = 0;
-            document.querySelectorAll('.marker').forEach(el => el.remove());
-            
-            // Selecionar 4 pontos ao longo da rota
-            const totalPoints = routeCoordinates.length;
-            const numPoints = 4;
-            
-            // Categorias possíveis para pontos gerados
-            const possibleCategories = [
-                ["historia", "arquitetura"],
-                ["natureza"],
-                ["gastronomia", "curiosidades"],
-                ["historia"]
-            ];
-            
-            for (let i = 1; i <= numPoints; i++) {
-                const index = Math.floor((totalPoints / (numPoints + 1)) * i);
-                const coord = routeCoordinates[index];
-                
-                const point = {
-                    id: i,
-                    name: `Ponto Histórico ${i}`,
-                    lat: coord[1],
-                    lng: coord[0],
-                    radius: 300,
-                    audio: `audio${i}.mp3`,
-                    categories: possibleCategories[i - 1] || ["curiosidades"],
-                    played: false,
-                    prompted: false
-                };
-                
-                historicalPoints.push(point);
-                
-                // Só adicionar marker se categoria ativa
-                if (shouldShowPoint(point)) {
-                    addMarker(point);
-                }
-            }
-        }
-
-        function shouldShowPoint(point) {
-            // Verificar se pelo menos uma categoria do ponto está ativa
-            return point.categories.some(cat => categoryFilters[cat]);
-        }
-
-        function addMarker(point) {
-            const el = document.createElement('div');
-            el.className = 'marker';
-            el.dataset.pointId = point.id;
-            new mapboxgl.Marker(el)
-                .setLngLat([point.lng, point.lat])
-                .addTo(map);
-        }
-
-        function updateMapMarkers() {
-            // Remover todos markers
-            document.querySelectorAll('.marker').forEach(el => el.remove());
-            
-            // Adicionar apenas markers com categorias ativas
-            historicalPoints.forEach(point => {
-                if (shouldShowPoint(point)) {
-                    addMarker(point);
-                }
-            });
-        }
-
-        // Fechar autocomplete ao clicar fora
-        document.addEventListener('click', (e) => {
-            if (!searchBox.contains(e.target) && !autocompleteEl.contains(e.target)) {
-                destinationName.style.display = 'block';
-                destinationInput.style.display = 'none';
-                destinationInput.value = '';
-                autocompleteEl.style.display = 'none';
-            }
-        });
-
-        // Iniciar navegação
-        startNavBtn.addEventListener('click', () => {
-            if (!currentRoute) return;
-            
-            isNavigating = true;
-            startNavBtn.style.display = 'none';
-            stopNavBtn.style.display = 'block';
-            
-            // Mostrar botão vista
-            viewToggle.classList.add('active');
-            
-            // Iniciar tracking GPS contínuo
-            startGPSTracking();
-            
-            // Modo navegação: seguir user
-            map.flyTo({
-                center: userLocation || currentRoute.geometry.coordinates[0],
-                zoom: 16,
-                pitch: is3DView ? 60 : 0,
-                bearing: userBearing
-            });
-        });
-
-        // Parar navegação
-        stopNavBtn.addEventListener('click', () => {
-            stopNavigation();
-        });
-
-        function stopNavigation() {
-            isNavigating = false;
-            startNavBtn.style.display = 'block';
-            stopNavBtn.style.display = 'none';
-            
-            // Esconder botão vista
-            viewToggle.classList.remove('active');
-            
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-            
-            // Voltar vista normal
-            map.flyTo({
-                pitch: 0,
-                bearing: 0,
-                zoom: 10
-            });
-        }
-
-        function startGPSTracking() {
-            if (!navigator.geolocation) return;
-            
-            watchId = navigator.geolocation.watchPosition(
-                position => {
-                    const { latitude, longitude, heading } = position.coords;
-                    userLocation = [longitude, latitude];
-                    userBearing = heading || 0;
-                    
-                    // Atualizar marker
-                    updateUserMarker(longitude, latitude, heading);
-                    
-                    if (isNavigating) {
-                        // Seguir utilizador
-                        map.setCenter([longitude, latitude]);
-                        if (heading !== null) {
-                            map.setBearing(heading);
-                        }
-                        
-                        // Manter pitch conforme preferência
-                        if (map.getPitch() !== (is3DView ? 60 : 0)) {
-                            map.setPitch(is3DView ? 60 : 0);
-                        }
-                        
-                        // Atualizar stats
-                        updateNavStats();
-                        
-                        // Verificar proximidade pontos
-                        checkProximity(latitude, longitude);
-                    }
-                },
-                error => console.error('GPS erro:', error),
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 5000
-                }
-            );
-        }
-
-        function updateUserMarker(lng, lat, heading) {
-            if (!userMarker) {
-                const el = document.createElement('div');
-                el.className = isNavigating ? 'user-marker-nav' : 'user-marker';
-                userMarker = new mapboxgl.Marker(el)
-                    .setLngLat([lng, lat])
-                    .addTo(map);
-            } else {
-                userMarker.setLngLat([lng, lat]);
-                
-                // Rodar seta na navegação
-                if (isNavigating && heading !== null) {
-                    const el = userMarker.getElement();
-                    el.className = 'user-marker-nav';
-                    el.style.transform = `rotate(${heading}deg)`;
-                }
-            }
-        }
-
-        function updateNavStats() {
-            if (!currentRoute || !userLocation) return;
-            
-            // Calcular distância até destino
-            const destCoords = currentDestination.coords;
-            const distance = getDistance(
-                userLocation[1], userLocation[0],
-                destCoords[1], destCoords[0]
-            );
-            
-            // Formatar distância
-            if (distance < 1000) {
-                distanceLeftEl.textContent = Math.round(distance) + ' m';
-            } else {
-                distanceLeftEl.textContent = (distance / 1000).toFixed(1) + ' km';
-            }
-            
-            // Estimar tempo (60 km/h média)
-            const timeMinutes = Math.round((distance / 1000) / 60 * 60);
-            if (timeMinutes < 60) {
-                timeLeftEl.textContent = timeMinutes + ' min';
-            } else {
-                const hours = Math.floor(timeMinutes / 60);
-                const mins = timeMinutes % 60;
-                timeLeftEl.textContent = `${hours}h ${mins}m`;
-            }
-        }
-
-        // Helpers
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        // Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
-    </script>
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
 </body>
 </html>
