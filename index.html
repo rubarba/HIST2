@@ -53,6 +53,75 @@ h1:not(.chapter-num), h2:not(.chapter-title), h3 {
   align-items: center;
 }
 
+.author-toggle {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.author-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-soft);
+  padding: 8px 12px;
+  min-height: 40px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.author-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.author-btn:active { transform: scale(0.96); }
+
+/* Etiqueta de autor nas anotações listadas e nos realces */
+.annotation-author {
+  display: inline-block;
+  background: var(--bg);
+  color: var(--accent);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Pequeno marcador no canto superior direito de cada realce */
+[data-ann-id] {
+  position: relative;
+}
+
+[data-ann-id]::after {
+  content: attr(data-author);
+  position: absolute;
+  top: -8px;
+  right: -2px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 0 3px;
+  border-radius: 3px;
+  pointer-events: none;
+  line-height: 1.4;
+}
+
 .size-btn {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -1547,6 +1616,10 @@ blockquote {
 
 <nav class="bottombar">
   <button class="bb-btn" id="open-sheet">Anotações <span class="bb-counter">· <span class="num" id="ann-count">0</span></span></button>
+  <div class="author-toggle">
+    <button class="author-btn" data-author="RB">RB</button>
+    <button class="author-btn" data-author="CD">CD</button>
+  </div>
   <div class="size-controls">
     <button class="size-btn s" data-size="s">aA</button>
     <button class="size-btn m" data-size="m">aA</button>
@@ -1582,6 +1655,7 @@ blockquote {
 
 <script>
 const STORAGE_KEY = 'manuscrito_acto_I_annotations';
+const AUTHOR_KEY = 'manuscrito_current_author';
 const CATEGORIES = {
   duvida: { label: 'Dúvida', class: 'h-duvida', emoji: '🟡' },
   cortar: { label: 'Cortar', class: 'h-cortar', emoji: '🔴' },
@@ -1592,6 +1666,7 @@ const CATEGORIES = {
 let annotations = [];
 let pendingSelection = null;
 let currentEditingId = null;
+let currentAuthor = 'RB';
 
 // ─── Persistence ────────────────────────────────────────────
 function load() {
@@ -1640,7 +1715,8 @@ function applyAllHighlights() {
       const sel = plain.slice(r.start, r.end);
       const after = plain.slice(r.end);
       const cls = CATEGORIES[r.cat].class;
-      plain = before + `<span class="${cls}" data-ann-id="${r.id}">` + escapeHtml(sel) + '</span>' + after;
+      const author = r.author || 'RB';
+      plain = before + `<span class="${cls}" data-ann-id="${r.id}" data-author="${author}">` + escapeHtml(sel) + '</span>' + after;
     });
     // For unhighlighted text we still want italics. So: only override if there are ranges.
     if (ranges.length > 0) {
@@ -1730,6 +1806,7 @@ function addAnnotation(cat) {
   const ann = {
     id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6),
     cat,
+    author: currentAuthor,
     pid: pendingSelection.pid,
     start: pendingSelection.start,
     end: pendingSelection.end,
@@ -1874,7 +1951,7 @@ function renderSheet() {
   });
   body.innerHTML = sorted.map(a => `
     <div class="annotation-item" data-jump="${a.pid}" data-id="${a.id}">
-      <div class="annotation-cat"><span class="sp-dot dot-${a.cat}"></span>${CATEGORIES[a.cat].label} · Cap. ${a.chapter}</div>
+      <div class="annotation-cat"><span class="sp-dot dot-${a.cat}"></span>${CATEGORIES[a.cat].label} · Cap. ${a.chapter}<span class="annotation-author">${a.author || 'RB'}</span></div>
       <div class="annotation-text">"${escapeHtmlText(a.text)}"</div>
       ${a.note ? `<div class="annotation-note">${escapeHtmlText(a.note)}</div>` : ''}
     </div>
@@ -1920,28 +1997,42 @@ function exportAnnotations() {
     return a.start - b.start;
   });
   const date = new Date().toISOString().slice(0, 10);
-  let txt = `ANOTAÇÕES — Manuscrito Acto I\nData: ${date}\nTotal: ${sorted.length}\n\n${'═'.repeat(60)}\n\n`;
 
-  // Group by chapter
-  const byChapter = {};
+  const byAuthor = { RB: [], CD: [] };
   sorted.forEach(a => {
-    const c = a.chapter || '?';
-    if (!byChapter[c]) byChapter[c] = [];
-    byChapter[c].push(a);
+    const au = a.author || 'RB';
+    if (!byAuthor[au]) byAuthor[au] = [];
+    byAuthor[au].push(a);
   });
 
-  Object.keys(byChapter).forEach(chapter => {
-    txt += `── CAPÍTULO ${chapter} ──\n\n`;
-    byChapter[chapter].forEach((a, i) => {
-      txt += `[${CATEGORIES[a.cat].label.toUpperCase()}]\n`;
-      txt += `"${a.text}"\n`;
-      if (a.note) txt += `\nNota: ${a.note}\n`;
-      txt += `\n${'─'.repeat(40)}\n\n`;
+  let txt = `ANOTAÇÕES — Manuscrito Acto I\n`;
+  txt += `Data: ${date}\n`;
+  txt += `Total: ${sorted.length} (RB: ${byAuthor.RB.length} · CD: ${byAuthor.CD.length})\n\n`;
+  txt += '═'.repeat(60) + '\n\n';
+
+  ['RB', 'CD'].forEach(au => {
+    if (!byAuthor[au] || byAuthor[au].length === 0) return;
+    txt += `\n╔════════════════════════════════════════════╗\n`;
+    txt += `║  NOTAS ${au}  (${byAuthor[au].length} anotações)\n`;
+    txt += `╚════════════════════════════════════════════╝\n\n`;
+
+    const byChapter = {};
+    byAuthor[au].forEach(a => {
+      const c = a.chapter || '?';
+      if (!byChapter[c]) byChapter[c] = [];
+      byChapter[c].push(a);
     });
-    txt += `\n`;
+    Object.keys(byChapter).forEach(chapter => {
+      txt += `── CAPÍTULO ${chapter} ──\n\n`;
+      byChapter[chapter].forEach(a => {
+        txt += `[${CATEGORIES[a.cat].label.toUpperCase()}]\n`;
+        txt += `"${a.text}"\n`;
+        if (a.note) txt += `\nNota: ${a.note}\n`;
+        txt += `\n${'─'.repeat(40)}\n\n`;
+      });
+      txt += `\n`;
+    });
   });
-
-
 
   const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -2177,10 +2268,25 @@ function init() {
     });
     localStorage.setItem(SIZE_KEY, size);
   }
-  // Carregar tamanho guardado (default: m)
   applySize(localStorage.getItem(SIZE_KEY) || 'm');
   document.querySelectorAll('.size-btn').forEach(b => {
     b.addEventListener('click', () => applySize(b.dataset.size));
+  });
+
+  // ─── Autor activo (RB / CD) ─────────────────────────────
+  function applyAuthor(au) {
+    currentAuthor = au;
+    document.querySelectorAll('.author-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.author === au);
+    });
+    localStorage.setItem(AUTHOR_KEY, au);
+  }
+  applyAuthor(localStorage.getItem(AUTHOR_KEY) || 'RB');
+  document.querySelectorAll('.author-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      applyAuthor(b.dataset.author);
+      showToast('A anotar como ' + b.dataset.author);
+    });
   });
 }
 
